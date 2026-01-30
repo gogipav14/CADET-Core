@@ -8,22 +8,27 @@ https://github.com/gogipav14/nilt-cfl
 
 Key Features:
 - CFL-informed parameter selection (Algorithm 1)
-- FFT-based Dubner-Abate/Hsu-Dranoff NILT
-- Two ε_Im diagnostics:
-  - one_sided_imag_ratio: Im/Re of one-sided IFFT (fast, high values normal)
-  - epsilon_im_paper: Paper-compliant ε_Im using irfft (should be ~1e-10)
+- FFT-based Bromwich integral with DFT-consistent frequency mapping
+- Paper-compliant ε_Im diagnostic: max|Im(z)|/max|Re(z)| should be ~1e-10
 - N-doubling convergence test
 - CADET-specific benchmark transfer functions
+
+Note: The frequency grid uses fftfreq() to properly map DFT bins k > N/2
+to negative frequencies. This ensures z_ifft is nearly real for real-valued
+f(t), making ε_Im a meaningful diagnostic.
 """
 
 # Re-export vendored library functions
 from .vendor import (
     fft_nilt,
-    fft_nilt_one_sided,
-    # Diagnostics
-    one_sided_imag_ratio,  # Im/Re of one-sided IFFT (NOT paper ε_Im)
-    epsilon_im_paper,       # Paper-compliant ε_Im using irfft
-    eps_im,                 # Deprecated alias for one_sided_imag_ratio
+    fft_nilt_one_sided,  # Deprecated
+    # Diagnostics (ε_Im)
+    eps_im_max,          # Paper-compliant: max|Im|/max|Re| (~1e-10 for real f(t))
+    eps_im_rms,          # Alternative: RMS(Im)/RMS(Re)
+    # Deprecated aliases
+    one_sided_imag_ratio,
+    epsilon_im_paper,
+    eps_im,
     n_doubling_error,
     # Parameter tuning
     tune_params,
@@ -54,12 +59,15 @@ from .benchmarks import (
 __all__ = [
     # Vendored core NILT
     "fft_nilt",
-    "fft_nilt_one_sided",
+    "fft_nilt_one_sided",  # Deprecated
     "n_doubling_error",
-    # Diagnostics (ε_Im)
-    "one_sided_imag_ratio",  # Im/Re of one-sided IFFT (fast, high values normal)
-    "epsilon_im_paper",       # Paper-compliant ε_Im (should be ~1e-10)
-    "eps_im",                 # Deprecated alias
+    # Diagnostics (ε_Im) - use eps_im_max for paper-compliant behavior
+    "eps_im_max",          # Paper-compliant: max|Im|/max|Re| (~1e-10 for real f(t))
+    "eps_im_rms",          # Alternative: RMS(Im)/RMS(Re)
+    # Deprecated aliases
+    "one_sided_imag_ratio",
+    "epsilon_im_paper",
+    "eps_im",
     # Parameter tuning
     "tune_params",
     "refine_until_accept",

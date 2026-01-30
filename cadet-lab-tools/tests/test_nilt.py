@@ -1,6 +1,10 @@
 """Tests for NILT verification pack.
 
 Tests for CFL-informed FFT-NILT implementation using vendored nilt-cfl library.
+
+Key change: The frequency grid now uses fftfreq() to properly map DFT bins
+k > N/2 to negative frequencies. This ensures z_ifft is nearly real for
+real-valued f(t), making ε_Im a meaningful diagnostic (~1e-10 expected).
 """
 
 import warnings
@@ -9,9 +13,11 @@ import pytest
 
 from cadet_lab.nilt import (
     fft_nilt,
-    eps_im,  # Deprecated alias
-    one_sided_imag_ratio,
-    epsilon_im_paper,
+    eps_im_max,        # Paper-compliant: max|Im|/max|Re|
+    eps_im_rms,        # RMS-based alternative
+    eps_im,            # Deprecated alias
+    one_sided_imag_ratio,  # Deprecated alias
+    epsilon_im_paper,  # Deprecated
     n_doubling_error,
     tune_params,
     check_cfl_feasibility,
@@ -109,10 +115,10 @@ class TestFftNilt:
         problem = get_problem("lag")  # First-order lag with tau=1
         params = tune_params(t_end=5.0, alpha_c=problem.alpha_c, C=problem.C)
 
-        # Use refine_until_accept with relaxed thresholds
+        # Use refine_until_accept - ε_Im should be small now (~1e-10)
         result = refine_until_accept(
             problem.F, params, t_end=5.0,
-            eps_im_max=1.0, eps_conv=1e-1, n_timing_runs=3
+            eps_im_threshold=1e-2, eps_conv=1e-2, n_timing_runs=3
         )
 
         t_eval = result["t_eval"]
@@ -142,7 +148,7 @@ class TestFftNilt:
 
         result = refine_until_accept(
             problem.F, params, t_end=10.0,
-            eps_im_max=1.0, eps_conv=1e-1, n_timing_runs=3
+            eps_im_threshold=1e-2, eps_conv=1e-2, n_timing_runs=3
         )
 
         t_eval = result["t_eval"]
@@ -169,7 +175,7 @@ class TestFftNilt:
 
         result = refine_until_accept(
             problem.F, params, t_end=10.0,
-            eps_im_max=1.0, eps_conv=1e-1, n_timing_runs=3,
+            eps_im_threshold=1e-2, eps_conv=1e-2, n_timing_runs=3,
             t_eval_min=2.5  # Start after delay
         )
 
@@ -191,32 +197,33 @@ class TestFftNilt:
 
 
 class TestEpsilonImTest:
-    """Tests for ε_Im convergence criterion."""
+    """Tests for ε_Im convergence criterion.
+
+    With DFT-consistent frequency mapping, ε_Im = max|Im|/max|Re| should be
+    ~1e-10 for real-valued f(t), making it a meaningful diagnostic.
+    """
 
     def test_epsilon_im_below_threshold_for_real_benchmark(self):
-        """ε_Im should be finite for real-valued benchmark functions.
+        """ε_Im should be small (~1e-10) for real-valued benchmark functions.
 
-        Note: ε_Im measures Im/Re ratio of raw IFFT output, not accuracy of f(t).
-        High values (~0.6) are normal for one-sided FFT and don't indicate incorrect results.
+        With correct DFT frequency mapping, z_ifft is nearly real for real f(t).
         """
         problem = get_problem("lag")
         result = epsilon_im_test(
             problem.F,
             t_end=10.0,
             alpha_c=problem.alpha_c,
-            threshold=1.0,  # Relaxed threshold - high ε_Im is normal
+            threshold=1e-2,  # Paper-compliant threshold (actual ~1e-10)
             C=problem.C,
         )
 
         assert isinstance(result, NiltConvergenceResult)
-        assert np.isfinite(result.epsilon_im)  # Verify computation succeeded
-        # Note: ε_Im ~0.6 is normal; we verify finite value, not strict threshold
+        assert np.isfinite(result.epsilon_im)
+        # ε_Im should now be small (not ~0.6 like before)
+        assert result.epsilon_im < 1e-2, f"ε_Im = {result.epsilon_im:.2e} too high"
 
     def test_epsilon_im_for_vendored_benchmarks(self):
-        """ε_Im should be finite for all vendored benchmark functions.
-
-        Note: ε_Im ~0.6-1.0 is normal for one-sided FFT. We verify finite values.
-        """
+        """ε_Im should be small for all vendored benchmark functions."""
         problems = get_all_problems()
 
         for name, problem in problems.items():
@@ -228,10 +235,12 @@ class TestEpsilonImTest:
                 problem.F,
                 t_end=10.0,
                 alpha_c=problem.alpha_c,
-                threshold=1.0,  # Relaxed - high ε_Im is normal
+                threshold=1e-2,  # Paper-compliant threshold
                 C=problem.C,
             )
             assert np.isfinite(result.epsilon_im), f"ε_Im computation failed for {name}"
+            # ε_Im should be small for all real-valued benchmarks
+            assert result.epsilon_im < 1e-2, f"ε_Im = {result.epsilon_im:.2e} too high for {name}"
 
 
 class TestNDoublingTest:
@@ -344,17 +353,19 @@ class TestRefineUntilAccept:
             problem.F,
             params,
             t_end=5.0,
-            eps_im_max=1.0,   # Relaxed - high ε_Im is normal
-            eps_conv=1e-1,    # Relaxed - achievable threshold
-            n_timing_runs=5,  # Reduce for test speed
+            eps_im_threshold=1e-2,  # Paper-compliant threshold
+            eps_conv=1e-2,          # Achievable threshold
+            n_timing_runs=5,        # Reduce for test speed
         )
 
-        # Verify result structure (acceptance may or may not occur depending on thresholds)
+        # Verify result structure
         assert "accepted" in result
         assert "eps_im" in result
         assert "E_N" in result
         assert np.isfinite(result["eps_im"])
         assert np.isfinite(result["E_N"])
+        # ε_Im should be small now
+        assert result["eps_im"] < 1e-2, f"ε_Im = {result['eps_im']:.2e} too high"
         # Verify solution arrays exist
         assert "f_eval" in result
         assert "t_eval" in result
@@ -364,54 +375,69 @@ class TestCadetBenchmarksWithNilt:
     """Tests for CADET-specific benchmarks with NILT."""
 
     def test_advection_dispersion_eps_im(self):
-        """ε_Im should be finite for advection-dispersion benchmark."""
+        """ε_Im should be small for advection-dispersion benchmark."""
         F = advection_dispersion_transfer(velocity=1e-3, dispersion=1e-6, length=0.1)
 
-        result = epsilon_im_test(F, t_end=100.0, alpha_c=0.0, threshold=1.0)
+        result = epsilon_im_test(F, t_end=100.0, alpha_c=0.0, threshold=1e-2)
 
         assert np.isfinite(result.epsilon_im), f"ε_Im computation failed: {result.epsilon_im}"
+        assert result.epsilon_im < 1e-2, f"ε_Im = {result.epsilon_im:.2e} too high"
 
     def test_langmuir_eps_im(self):
-        """ε_Im should be finite for Langmuir column benchmark."""
+        """ε_Im should be small for Langmuir column benchmark."""
         F = langmuir_column_transfer(
             velocity=1e-3, dispersion=1e-6, length=0.1,
             ka=1.0, kd=0.1, qmax=10.0
         )
 
-        result = epsilon_im_test(F, t_end=200.0, alpha_c=0.0, threshold=1.0)
+        result = epsilon_im_test(F, t_end=200.0, alpha_c=0.0, threshold=1e-2)
 
         assert np.isfinite(result.epsilon_im), f"ε_Im computation failed: {result.epsilon_im}"
+        assert result.epsilon_im < 1e-2, f"ε_Im = {result.epsilon_im:.2e} too high"
 
 
 class TestDiagnosticsSemantics:
-    """Tests for ε_Im diagnostic semantics (paper vs one-sided)."""
+    """Tests for ε_Im diagnostic semantics.
 
-    def test_one_sided_imag_ratio_is_finite_and_documented(self):
-        """one_sided_imag_ratio should be finite and high values are expected."""
+    With DFT-consistent frequency mapping, ε_Im = max|Im|/max|Re| should be
+    ~1e-10 for real-valued f(t). The old workarounds (one_sided_imag_ratio,
+    epsilon_im_paper) are now deprecated.
+    """
+
+    def test_eps_im_max_is_small_for_real_functions(self):
+        """eps_im_max should be small (~1e-10) for real-valued f(t)."""
         problem = get_problem("lag")
         params = tune_params(t_end=5.0, alpha_c=problem.alpha_c, C=problem.C)
 
-        # Compute NILT with diagnostics
-        f, t, z_ifft, _ = fft_nilt(
-            problem.F, params.a, params.T, params.N, diagnostics_mode="none"
-        )
+        # Compute NILT
+        f, t, z_ifft, eps_im = fft_nilt(problem.F, params.a, params.T, params.N)
 
-        # Compute one_sided_imag_ratio
-        ratio = one_sided_imag_ratio(z_ifft)
+        # ε_Im should be small now (not ~0.6 like before)
+        assert np.isfinite(eps_im)
+        assert eps_im < 1e-2, f"ε_Im = {eps_im:.2e} too high (expected ~1e-10)"
 
-        # Should be finite but can be high (~0.6)
-        assert np.isfinite(ratio)
-        # High values are expected for one-sided FFT (document this is NOT an error)
-        assert ratio > 0, "one_sided_imag_ratio should be positive"
+        # Verify z_ifft is nearly real
+        max_imag = np.max(np.abs(np.imag(z_ifft)))
+        max_real = np.max(np.abs(np.real(z_ifft)))
+        assert max_imag / max_real < 1e-2, "z_ifft should be nearly real"
+
+    def test_eps_im_rms_also_small(self):
+        """eps_im_rms should also be small for real-valued f(t)."""
+        problem = get_problem("lag")
+        params = tune_params(t_end=5.0, alpha_c=problem.alpha_c, C=problem.C)
+
+        f, t, z_ifft, _ = fft_nilt(problem.F, params.a, params.T, params.N)
+
+        rms_ratio = eps_im_rms(z_ifft)
+        assert np.isfinite(rms_ratio)
+        assert rms_ratio < 1e-2, f"RMS ratio = {rms_ratio:.2e} too high"
 
     def test_eps_im_deprecated_alias_warns(self):
         """eps_im should warn about deprecation."""
         problem = get_problem("lag")
         params = tune_params(t_end=5.0, alpha_c=problem.alpha_c, C=problem.C)
 
-        f, t, z_ifft, _ = fft_nilt(
-            problem.F, params.a, params.T, params.N, diagnostics_mode="none"
-        )
+        f, t, z_ifft, _ = fft_nilt(problem.F, params.a, params.T, params.N)
 
         # Should emit deprecation warning
         with warnings.catch_warnings(record=True) as w:
@@ -420,53 +446,31 @@ class TestDiagnosticsSemantics:
             assert len(w) == 1
             assert issubclass(w[0].category, DeprecationWarning)
             assert "eps_im()" in str(w[0].message)
-            assert "one_sided_imag_ratio" in str(w[0].message)
 
-    def test_epsilon_im_paper_computes_correctly(self):
-        """epsilon_im_paper should compute paper-compliant ε_Im."""
+    def test_one_sided_imag_ratio_deprecated(self):
+        """one_sided_imag_ratio should warn about deprecation."""
         problem = get_problem("lag")
         params = tune_params(t_end=5.0, alpha_c=problem.alpha_c, C=problem.C)
 
-        # Build frequency samples manually
-        N = params.N
-        T = params.T
-        a = params.a
-        delta_omega = np.pi / T
-        omega = np.arange(N) * delta_omega
-        s = a + 1j * omega
-        G = np.array([problem.F(sk) for sk in s], dtype=np.complex128)
-        G[0] = G[0] / 2  # Trapezoidal weight
+        f, t, z_ifft, _ = fft_nilt(problem.F, params.a, params.T, params.N)
 
-        # Compute paper ε_Im
-        paper_eps_im = epsilon_im_paper(G, N, a, T)
+        # Should emit deprecation warning
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = one_sided_imag_ratio(z_ifft)
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
 
-        # Should be finite
-        assert np.isfinite(paper_eps_im)
-        # Paper ε_Im should be much smaller than one_sided_imag_ratio
-        # (though exact value depends on problem and parameters)
-        assert paper_eps_im >= 0
-
-    def test_diagnostics_mode_returns_correct_type(self):
-        """fft_nilt diagnostics_mode should return appropriate values."""
+    def test_fft_nilt_returns_eps_im_directly(self):
+        """fft_nilt now returns ε_Im directly (no diagnostics_mode)."""
         problem = get_problem("lag")
         params = tune_params(t_end=5.0, alpha_c=problem.alpha_c, C=problem.C)
 
-        # Test "none" mode
-        f, t, z, eps_none = fft_nilt(
-            problem.F, params.a, params.T, params.N, diagnostics_mode="none"
-        )
-        assert eps_none is None
+        # fft_nilt returns (f, t, z_ifft, eps_im)
+        f, t, z_ifft, eps_im = fft_nilt(problem.F, params.a, params.T, params.N)
 
-        # Test "one_sided" mode
-        f, t, z, eps_one = fft_nilt(
-            problem.F, params.a, params.T, params.N, diagnostics_mode="one_sided"
-        )
-        assert eps_one is not None
-        assert np.isfinite(eps_one)
-
-        # Test "paper" mode
-        f, t, z, eps_paper = fft_nilt(
-            problem.F, params.a, params.T, params.N, diagnostics_mode="paper"
-        )
-        assert eps_paper is not None
-        assert np.isfinite(eps_paper)
+        assert len(f) == params.N
+        assert len(t) == params.N
+        assert len(z_ifft) == params.N
+        assert np.isfinite(eps_im)
+        assert eps_im < 1e-2, f"ε_Im = {eps_im:.2e} too high"

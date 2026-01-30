@@ -4,17 +4,15 @@ Provides simplified wrappers around the vendored nilt-cfl library
 convergence metrics with structured result objects.
 
 Diagnostics:
-- one_sided_imag_ratio: Im/Re of one-sided IFFT output. High values (~0.6)
-  are expected and do NOT indicate errors. This is NOT paper2_nilt_cfl ε_Im.
-- epsilon_im_paper: Paper-compliant ε_Im using irfft reconstruction.
-  Should be ~1e-10 for real-valued functions.
+- eps_im_max: Paper-compliant ε_Im = max|Im(z)|/max|Re(z)|.
+  Should be ~1e-10 for real-valued functions with DFT-consistent frequency mapping.
 """
 
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 import numpy as np
 
-from .vendor import fft_nilt, one_sided_imag_ratio, n_doubling_error, tune_params
+from .vendor import fft_nilt, eps_im_max, n_doubling_error, tune_params
 
 
 @dataclass
@@ -61,26 +59,23 @@ def epsilon_im_test(
     use_refinement: bool = True,
     C: float = 1.0,
 ) -> NiltConvergenceResult:
-    """Test convergence via one_sided_imag_ratio metric.
+    """Test convergence via paper-compliant ε_Im diagnostic.
 
-    NOTE: This uses one_sided_imag_ratio (Im/Re of one-sided IFFT output),
-    which is NOT the paper2_nilt_cfl ε_Im. High values (~0.6) are expected
-    for one-sided FFT evaluation and do NOT indicate errors.
-
-    For paper-compliant ε_Im testing, use epsilon_im_paper() directly.
+    Uses eps_im_max = max|Im(z)|/max|Re(z)| which should be ~1e-10 for
+    real-valued f(t) when using DFT-consistent frequency mapping.
 
     Args:
         F: Laplace-domain transfer function F(s).
         t_end: End time for evaluation.
         alpha_c: Abscissa of convergence (default 0.0).
         threshold: Threshold for pass/fail (default 1e-2).
-            NOTE: For one_sided_imag_ratio, values ~0.6-1.0 are normal.
+            With correct frequency mapping, ε_Im should be ~1e-10.
         t_eval_min: Minimum time for evaluation (default 0.1).
         use_refinement: If True, use adaptive N-doubling refinement.
         C: Tail envelope constant for parameter tuning.
 
     Returns:
-        NiltConvergenceResult with one_sided_imag_ratio value and pass/fail status.
+        NiltConvergenceResult with ε_Im value and pass/fail status.
     """
     from .vendor import refine_until_accept
 
@@ -99,27 +94,25 @@ def epsilon_im_test(
         # Use adaptive refinement to achieve threshold
         result = refine_until_accept(
             F, params, t_end,
-            eps_im_max=threshold,
+            eps_im_threshold=threshold,
             eps_conv=threshold,
             t_eval_min=t_eval_min,
             n_timing_runs=5,
         )
-        epsilon_im_value = float(result["one_sided_imag_ratio"])
+        epsilon_im_value = float(result["eps_im"])
         passed = bool(result["accepted"])
     else:
         # Single evaluation without refinement
-        f_full, t_full, z_ifft, _ = fft_nilt(
-            F, params.a, params.T, params.N, diagnostics_mode="none"
-        )
+        f_full, t_full, z_ifft, eps_im_full = fft_nilt(F, params.a, params.T, params.N)
         mask = (t_full >= t_eval_min) & (t_full <= t_end)
-        epsilon_im_value = float(one_sided_imag_ratio(z_ifft[mask]))
+        epsilon_im_value = float(eps_im_max(z_ifft[mask]))
         passed = epsilon_im_value <= threshold
 
     return NiltConvergenceResult(
         passed=passed,
         epsilon_im=epsilon_im_value,
         threshold=threshold,
-        message=f"one_sided_imag_ratio = {epsilon_im_value:.2e}, threshold = {threshold:.2e}",
+        message=f"eps_im = {epsilon_im_value:.2e}, threshold = {threshold:.2e}",
     )
 
 

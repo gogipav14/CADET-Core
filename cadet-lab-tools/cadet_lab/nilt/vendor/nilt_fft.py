@@ -3,14 +3,22 @@
 Vendored from: https://github.com/gogipav14/nilt-cfl
 License: MIT
 
-Implements the Dubner-Abate/Hsu-Dranoff FFT method with CFL-informed
-parameter selection.
+Implements FFT acceleration of the trapezoidal Bromwich integral using
+DFT-consistent frequency bins (positive and negative ω via FFT ordering).
+
+For real-valued time-domain functions f(t), the Laplace transform obeys
+conjugate symmetry: F(conj(s)) = conj(F(s)), i.e., F(a-iω) = conj(F(a+iω)).
+This means the IFFT output z_ifft should be nearly real, and the imaginary
+part measures numerical leakage (aliasing, truncation, roundoff).
+
+The ε_Im diagnostic (max|Im|/max|Re|) should be ~1e-10 for well-conditioned
+real-valued benchmark functions when using DFT-consistent frequency mapping.
 """
 
 from __future__ import annotations
 import numpy as np
 import warnings
-from typing import Callable, Tuple, Literal, Optional
+from typing import Callable, Tuple, Optional
 
 
 def fft_nilt(
@@ -19,14 +27,13 @@ def fft_nilt(
     T: float,
     N: int,
     return_complex: bool = False,
-    diagnostics_mode: Literal["none", "one_sided", "paper"] = "one_sided"
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Optional[float]]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
     """
-    Compute inverse Laplace transform using Dubner-Abate FFT method.
+    Compute inverse Laplace transform using FFT-accelerated Bromwich integral.
 
-    Evaluates F(s) along the Bromwich contour Re(s) = a at positive
-    frequencies ω_k = k*Δω for k = 0, 1, ..., N-1, then uses IFFT
-    followed by Re[] extraction.
+    Uses DFT-consistent frequency bins where indices k > N/2 represent
+    negative frequencies (wrap-around). This ensures z_ifft is nearly real
+    for real-valued f(t), making ε_Im a meaningful diagnostic.
 
     Parameters
     ----------
@@ -40,10 +47,6 @@ def fft_nilt(
         Number of FFT points (preferably power of 2)
     return_complex : bool
         Unused, kept for API compatibility
-    diagnostics_mode : {"none", "one_sided", "paper"}
-        - "none": No diagnostic computed
-        - "one_sided": Compute one_sided_imag_ratio on complex IFFT output (legacy)
-        - "paper": Compute paper-compliant ε_Im using irfft reconstruction
 
     Returns
     -------
@@ -52,9 +55,9 @@ def fft_nilt(
     t : ndarray
         Time points t_j for j = 0, ..., N-1
     z_ifft : ndarray
-        Complex IFFT output (before Re[] extraction)
-    eps_im : float or None
-        Diagnostic value (depends on diagnostics_mode), or None if "none"
+        Complex IFFT output (should be nearly real for real f(t))
+    eps_im : float
+        Paper-compliant ε_Im = max|Im(z)|/max|Re(z)| (should be ~1e-10)
 
     Notes
     -----
@@ -65,49 +68,37 @@ def fft_nilt(
 
     The result accuracy is controlled by N (truncation error) and the
     CFL parameters (aliasing error).
-
-    Diagnostics modes:
-    - "one_sided": Im/Re ratio of raw IFFT output. High values (~0.6) are
-      expected and do NOT indicate errors. This is NOT paper2_nilt_cfl ε_Im.
-    - "paper": Uses irfft to reconstruct a real-valued time signal from the
-      positive frequency bins. ε_Im should be ~1e-10 for real-valued f(t).
-      This matches paper2_nilt_cfl Eq. (28) intent.
     """
-    # Frequency spacing: Δω = π/T
-    delta_omega = np.pi / T
-
     # Time step: Δt = 2T/N
     delta_t = 2 * T / N
 
     # Time grid: t_j = j * Δt for j = 0, ..., N-1
     t = np.arange(N) * delta_t
 
-    # Frequency grid: ω_k = k * Δω for k = 0, ..., N-1
-    omega = np.arange(N) * delta_omega
+    # DFT-consistent frequency grid using fftfreq
+    # This maps bins k > N/2 to negative frequencies (wrap-around)
+    # fftfreq returns frequencies in cycles/sample, multiply by 2π to get angular freq
+    omega = 2 * np.pi * np.fft.fftfreq(N, d=delta_t)
     s = a + 1j * omega
 
-    # Evaluate F(s) at Bromwich contour points
+    # Evaluate F(s) at Bromwich contour points (includes negative ω for k > N/2)
     G = np.array([F(sk) for sk in s], dtype=np.complex128)
 
     # Apply trapezoidal weight at DC (k=0 endpoint)
-    G[0] = G[0] / 2
+    G[0] = G[0] * 0.5
 
     # Compute sum via IFFT
     # IFFT: (1/N) * Σ G[k] exp(i 2π k j / N)
-    # Our sum: Σ G[k] exp(i k Δω t_j) = Σ G[k] exp(i 2π k j / N) [since Δω*Δt = 2π/N]
+    # Our sum: Σ G[k] exp(i ω_k t_j) matches this with DFT-consistent ω
     # So multiply IFFT by N
     z_ifft = N * np.fft.ifft(G)
+
+    # Compute paper-compliant ε_Im = max|Im|/max|Re| (should be ~1e-10 for real f(t))
+    eps_im_value = eps_im_max(z_ifft)
 
     # Apply exponential factor, scaling, and extract real part
     # f(t) = exp(a*t) / T * Re[sum]
     f = np.exp(a * t) / T * np.real(z_ifft)
-
-    # Compute diagnostic based on mode
-    eps_im_value: Optional[float] = None
-    if diagnostics_mode == "one_sided":
-        eps_im_value = one_sided_imag_ratio(z_ifft)
-    elif diagnostics_mode == "paper":
-        eps_im_value = epsilon_im_paper(G, N, a, T)
 
     return f, t, z_ifft, eps_im_value
 
@@ -119,43 +110,65 @@ def fft_nilt_one_sided(
     N: int
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    One-sided (non-Hermitian) implementation for comparison.
+    Legacy one-sided implementation (DEPRECATED).
 
-    This is the traditional Hsu-Dranoff approach that evaluates F(s)
-    at all N frequencies and takes Re[] at the end.
+    This function is kept for backward compatibility but uses incorrect
+    frequency mapping. Use fft_nilt() instead which uses DFT-consistent
+    frequency bins.
 
-    May have larger imaginary leakage due to accumulated phase errors.
+    The old approach evaluated F(s) at positive frequencies only (ω ≥ 0)
+    but then used ifft which expects DFT bin ordering (k > N/2 = negative ω).
+    This caused z_ifft to be complex by construction, not due to numerical error.
     """
-    delta_omega = np.pi / T
-    delta_t = 2 * T / N
-    t = np.arange(N) * delta_t
-    omega = np.arange(N) * delta_omega
-    s = a + 1j * omega
-
-    G = np.array([F(sk) for sk in s], dtype=np.complex128)
-    G[0] = G[0] / 2  # Trapezoidal weight for DC
-
-    z_ifft = N * np.fft.ifft(G)
-    f = np.exp(a * t) / T * np.real(z_ifft)
-
+    warnings.warn(
+        "fft_nilt_one_sided() uses incorrect frequency mapping and is deprecated. "
+        "Use fft_nilt() instead which uses DFT-consistent frequency bins.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    # Use correct implementation
+    f, t, z_ifft, _ = fft_nilt(F, a, T, N)
     return f, t, z_ifft
 
 
-def one_sided_imag_ratio(z_ifft: np.ndarray) -> float:
+def eps_im_max(z_ifft: np.ndarray) -> float:
     """
-    Compute Im/Re ratio of one-sided IFFT output.
+    Compute paper-compliant ε_Im = max|Im(z)| / max|Re(z)|.
 
-    NOTE: This is NOT the ε_Im from paper2_nilt_cfl. High values (~0.6)
-    are expected for one-sided FFT evaluation and do NOT indicate errors.
-    The imaginary component arises because the spectrum lacks Hermitian
-    symmetry, not from numerical inaccuracy.
-
-    For the paper-compliant ε_Im diagnostic, use epsilon_im_paper() instead.
+    This is the ε_Im diagnostic from paper2_nilt_cfl Eq. (28).
+    For real-valued f(t), z_ifft should be nearly real when using
+    DFT-consistent frequency mapping. Values should be ~1e-10.
 
     Parameters
     ----------
     z_ifft : ndarray
-        Complex IFFT output from one-sided frequency evaluation
+        Complex IFFT output from fft_nilt
+
+    Returns
+    -------
+    eps_im : float
+        max|Im(z)| / max|Re(z)| - should be ~1e-10 for real functions
+    """
+    max_real = np.max(np.abs(np.real(z_ifft)))
+    max_imag = np.max(np.abs(np.imag(z_ifft)))
+
+    if max_real < 1e-300:
+        return np.inf
+
+    return max_imag / max_real
+
+
+def eps_im_rms(z_ifft: np.ndarray) -> float:
+    """
+    Compute RMS-based ε_Im ratio = RMS(Im(z)) / RMS(Re(z)).
+
+    Alternative to eps_im_max using RMS instead of max norm.
+    Less sensitive to outliers but may mask localized issues.
+
+    Parameters
+    ----------
+    z_ifft : ndarray
+        Complex IFFT output from fft_nilt
 
     Returns
     -------
@@ -174,16 +187,27 @@ def one_sided_imag_ratio(z_ifft: np.ndarray) -> float:
     return rms_imag / rms_real
 
 
-def eps_im(z_ifft: np.ndarray) -> float:
-    """Deprecated alias for one_sided_imag_ratio. Use one_sided_imag_ratio instead."""
+# Backward compatibility aliases
+def one_sided_imag_ratio(z_ifft: np.ndarray) -> float:
+    """Deprecated alias for eps_im_max. Use eps_im_max instead."""
     warnings.warn(
-        "eps_im() is deprecated and does NOT compute paper2_nilt_cfl ε_Im. "
-        "Use one_sided_imag_ratio() for this metric or epsilon_im_paper() for "
-        "the paper-compliant diagnostic.",
+        "one_sided_imag_ratio() is deprecated. Use eps_im_max() instead. "
+        "With DFT-consistent frequency mapping, ε_Im should be ~1e-10 for real f(t).",
         DeprecationWarning,
         stacklevel=2
     )
-    return one_sided_imag_ratio(z_ifft)
+    return eps_im_max(z_ifft)
+
+
+def eps_im(z_ifft: np.ndarray) -> float:
+    """Deprecated alias for eps_im_max. Use eps_im_max instead."""
+    warnings.warn(
+        "eps_im() is deprecated. Use eps_im_max() for paper-compliant ε_Im "
+        "(max|Im|/max|Re|) or eps_im_rms() for RMS-based ratio.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return eps_im_max(z_ifft)
 
 
 def epsilon_im_paper(
@@ -195,72 +219,28 @@ def epsilon_im_paper(
     t_eval_max: Optional[float] = None
 ) -> float:
     """
-    Compute paper2_nilt_cfl ε_Im using real-valued irfft reconstruction.
+    Deprecated - use eps_im_max(z_ifft) directly instead.
 
-    This is the proper ε_Im diagnostic from paper2_nilt_cfl Eq. (28):
-    ε_Im = max|Im(f̃(t))| / max|Re(f̃(t))|
-
-    For a real-valued time-domain function f(t), the NILT output should be
-    purely real. This diagnostic measures numerical consistency and should
-    be ~1e-10 for well-conditioned problems (not ~0.6 like one_sided_imag_ratio).
-
-    Parameters
-    ----------
-    G : ndarray
-        Complex frequency-domain samples F(s_k) for k=0,...,N-1
-        (with trapezoidal weight already applied to G[0])
-    N : int
-        Number of time points (must be even for irfft)
-    a : float
-        Bromwich shift parameter
-    T : float
-        Half-period
-    t_eval_min : float
-        Minimum time for evaluation (default 0.0)
-    t_eval_max : float, optional
-        Maximum time for evaluation (default T)
-
-    Returns
-    -------
-    eps_im : float
-        Paper-compliant ε_Im diagnostic (should be ~1e-10 for real functions)
+    With correct DFT frequency mapping, eps_im_max on z_ifft from fft_nilt()
+    gives the paper-compliant ε_Im directly. This function is no longer needed.
     """
+    warnings.warn(
+        "epsilon_im_paper() is deprecated. With DFT-consistent frequency mapping "
+        "in fft_nilt(), use eps_im_max(z_ifft) directly for paper-compliant ε_Im.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    # Recompute z_ifft from G (already has trapezoidal weight on G[0])
+    z_ifft = N * np.fft.ifft(G)
+
     if t_eval_max is None:
-        t_eval_max = T
+        t_eval_max = 2 * N  # Use all points
 
-    # For irfft with output length N, we need N//2 + 1 positive frequency bins
-    # Current G has N bins (k=0,...,N-1), so take G[:N//2+1]
-    n_rfft = N // 2 + 1
-    G_rfft = G[:n_rfft].copy()
-
-    # irfft expects the positive frequencies including DC and Nyquist
-    # The Nyquist bin (k=N/2) should be real for a real signal
-    # Scale: irfft gives (1/N) * sum, we want sum, so multiply by N
-    z_real = N * np.fft.irfft(G_rfft, n=N)
-
-    # Apply exponential factor and scaling
-    delta_t = 2 * T / N
+    delta_t = 2 * (t_eval_max / 2) / N if t_eval_max else 1.0
     t = np.arange(N) * delta_t
-    f_reconstructed = np.exp(a * t) / T * z_real
-
-    # For paper ε_Im, we need the imaginary part of the NILT output
-    # With irfft, the output is real by construction, so we compute ε_Im
-    # by comparing irfft result to the complex ifft result
-    z_ifft_complex = N * np.fft.ifft(G)
-    f_complex = np.exp(a * t) / T * z_ifft_complex
-
-    # Evaluate on the specified time window
     mask = (t >= t_eval_min) & (t <= t_eval_max)
-    f_complex_window = f_complex[mask]
 
-    # Paper ε_Im: max|Im| / max|Re|
-    max_imag = np.max(np.abs(np.imag(f_complex_window)))
-    max_real = np.max(np.abs(np.real(f_complex_window)))
-
-    if max_real < 1e-300:
-        return np.inf
-
-    return max_imag / max_real
+    return eps_im_max(z_ifft[mask]) if np.any(mask) else eps_im_max(z_ifft)
 
 
 def n_doubling_error(
@@ -305,11 +285,11 @@ def n_doubling_error(
     if t_eval_max is None:
         t_eval_max = T
 
-    # Compute at N points (ignore diagnostics)
-    f_N_full, t_N, _, _ = fft_nilt(F, a, T, N, diagnostics_mode="none")
+    # Compute at N points
+    f_N_full, t_N, _, _ = fft_nilt(F, a, T, N)
 
-    # Compute at 2N points (ignore diagnostics)
-    f_2N_full, t_2N, _, _ = fft_nilt(F, a, T, 2 * N, diagnostics_mode="none")
+    # Compute at 2N points
+    f_2N_full, t_2N, _, _ = fft_nilt(F, a, T, 2 * N)
 
     # Interpolate to common evaluation grid
     # Use the 2N time points within evaluation range
