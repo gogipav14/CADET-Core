@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cadet-lab-tools"
+version = "0.1.0"
+description = "Telemetry and stress testing harness for CADET simulations"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "BSD-3-Clause"}
+dependencies = [
+    "numpy>=1.20",
+    "h5py>=3.0",
+    "cadet-python>=0.14",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+cadet-lab = "cadet_lab.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cadet_lab*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
