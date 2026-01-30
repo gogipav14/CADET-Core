@@ -135,6 +135,8 @@ public:
 	virtual double totalSimulationDuration() const CADET_NOEXCEPT { return _timerIntegration.totalElapsedTime(); }
 
 	virtual void setNotificationCallback(INotificationCallback* nc) CADET_NOEXCEPT;
+
+	virtual SolverStatistics getSolverStatistics() const CADET_NOEXCEPT { return _solverStats; }
 protected:
 
 	/**
@@ -285,6 +287,8 @@ protected:
 	double _lastIntTime; //!< Last simulation duration
 
 	INotificationCallback* _notification; //!< Callback handler for notifications
+
+	SolverStatistics _solverStats; //!< Accumulated solver statistics from last integration
 };
 
 } // namespace cadet

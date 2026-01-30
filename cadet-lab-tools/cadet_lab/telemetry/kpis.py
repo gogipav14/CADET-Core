@@ -91,7 +91,8 @@ def compute_kpis(
     num_steps = solver_stats.get("NUM_STEPS")
     num_rhs_evals = solver_stats.get("NUM_RHS_EVALS")
     num_err_test_fails = solver_stats.get("NUM_ERR_TEST_FAILS")
-    num_conv_fails = solver_stats.get("NUM_CONV_FAILS")
+    # Handle both old and new naming conventions
+    num_conv_fails = solver_stats.get("NUM_NONLIN_CONV_FAILS") or solver_stats.get("NUM_CONV_FAILS")
 
     # Compute reject ratio
     reject_ratio = None

@@ -177,35 +177,62 @@ def _read_solver_stats(f: h5py.File) -> Optional[Dict[str, any]]:
 
     Looks for versioned /output/solver_statistics/ group.
     Falls back to checking common statistic locations.
+
+    The solver_statistics group (when present) contains:
+        - VERSION: Schema version (int)
+        - NUM_STEPS: Total time steps taken
+        - NUM_RHS_EVALS: Total residual evaluations
+        - NUM_LINSOL_SETUPS: Total linear solver setups
+        - NUM_ERR_TEST_FAILS: Total error test failures
+        - NUM_NONLIN_CONV_FAILS: Total nonlinear convergence failures
+        - NUM_NONLIN_ITERS: Total nonlinear solver iterations
     """
     stats = {}
 
-    # Check for versioned solver_statistics group (Phase A enhancement)
+    # Check for versioned solver_statistics group (Phase A2 enhancement)
     if "output/solver_statistics" in f:
         stats_group = f["output/solver_statistics"]
 
-        # Check version for compatibility
-        version = stats_group.attrs.get("VERSION", 1)
+        # Check version for compatibility - can be dataset or attribute
+        if "VERSION" in stats_group:
+            version = int(stats_group["VERSION"][()])
+        else:
+            version = stats_group.attrs.get("VERSION", 1)
         stats["_version"] = version
 
-        # Read available statistics
+        # Read available statistics - handle both scalar and array formats
         stat_names = [
             "NUM_STEPS",
             "NUM_RHS_EVALS",
             "NUM_LINSOL_SETUPS",
             "NUM_ERR_TEST_FAILS",
-            "NUM_CONV_FAILS",
+            "NUM_NONLIN_CONV_FAILS",  # New name from C++ implementation
+            "NUM_NONLIN_ITERS",       # New field
+            "NUM_CONV_FAILS",         # Legacy name (fallback)
         ]
 
         for name in stat_names:
             if name in stats_group:
-                data = stats_group[name][:]
-                # Sum across sections if array
-                stats[name] = int(np.sum(data)) if data.ndim > 0 else int(data)
+                data = stats_group[name][()]
+                # Handle both scalar and array formats
+                if hasattr(data, 'ndim') and data.ndim > 0:
+                    stats[name] = int(np.sum(data))
+                else:
+                    stats[name] = int(data)
+
+        # Normalize legacy name to new name
+        if "NUM_CONV_FAILS" in stats and "NUM_NONLIN_CONV_FAILS" not in stats:
+            stats["NUM_NONLIN_CONV_FAILS"] = stats.pop("NUM_CONV_FAILS")
 
     # Also check meta group for timing info
     if "output/meta" in f:
         meta = f["output/meta"]
+        if "TIME_SIM" in meta:
+            stats["TIME_SIM"] = float(meta["TIME_SIM"][()])
+
+    # Check /meta at root level too (some CADET versions)
+    if "meta" in f and "output/meta" not in f:
+        meta = f["meta"]
         if "TIME_SIM" in meta:
             stats["TIME_SIM"] = float(meta["TIME_SIM"][()])
 

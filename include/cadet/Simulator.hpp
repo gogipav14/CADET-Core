@@ -168,6 +168,25 @@ inline bool isValidConsistentInitialization(int ci) CADET_NOEXCEPT
 }
 
 /**
+ * @brief Holds solver statistics from time integration
+ * @details Accumulated statistics from the IDAS time integrator.
+ */
+struct CADET_API SolverStatistics
+{
+	long numSteps;                //!< Total number of internal time steps taken
+	long numRhsEvals;             //!< Total number of residual (RHS) evaluations
+	long numLinSolSetups;         //!< Total number of linear solver setups (Jacobian evaluations)
+	long numErrTestFails;         //!< Total number of local error test failures
+	long numNonlinSolvConvFails;  //!< Total number of nonlinear solver convergence failures
+	long numNonlinSolvIters;      //!< Total number of nonlinear solver iterations
+
+	SolverStatistics() CADET_NOEXCEPT
+		: numSteps(0), numRhsEvals(0), numLinSolSetups(0),
+		  numErrTestFails(0), numNonlinSolvConvFails(0), numNonlinSolvIters(0)
+	{ }
+};
+
+/**
  * @brief Provides functionality to simulate a model using a time integrator
  */
 class CADET_API ISimulator
@@ -726,6 +745,13 @@ public:
 	 * @param[in] nc Object to receive notifications or @c nullptr to disable notifications
 	 */
 	virtual void setNotificationCallback(INotificationCallback* nc) CADET_NOEXCEPT = 0;
+
+	/**
+	 * @brief Returns accumulated solver statistics from the last integration
+	 * @details The statistics are accumulated over all sections and time steps.
+	 * @return SolverStatistics struct containing accumulated counters
+	 */
+	virtual SolverStatistics getSolverStatistics() const CADET_NOEXCEPT = 0;
 };
 
 } // namespace cadet

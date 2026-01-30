@@ -1401,6 +1401,19 @@ namespace cadet
 
 		} // for (_sec ...)
 
+		// Collect solver statistics from IDAS
+		IDAGetNumSteps(_idaMemBlock, &_solverStats.numSteps);
+		IDAGetNumResEvals(_idaMemBlock, &_solverStats.numRhsEvals);
+		IDAGetNumLinSolvSetups(_idaMemBlock, &_solverStats.numLinSolSetups);
+		IDAGetNumErrTestFails(_idaMemBlock, &_solverStats.numErrTestFails);
+		IDAGetNumNonlinSolvIters(_idaMemBlock, &_solverStats.numNonlinSolvIters);
+		IDAGetNumNonlinSolvConvFails(_idaMemBlock, &_solverStats.numNonlinSolvConvFails);
+
+		LOG(Debug) << "Solver statistics: Steps=" << _solverStats.numSteps
+			<< " RhsEvals=" << _solverStats.numRhsEvals
+			<< " ErrTestFails=" << _solverStats.numErrTestFails
+			<< " ConvFails=" << _solverStats.numNonlinSolvConvFails;
+
 		_lastIntTime = _timerIntegration.stop();
 
 		if (_notification)

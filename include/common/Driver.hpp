@@ -179,7 +179,7 @@ void readSensitivityInitialState(ParamProvider_t& pp, const char* prefix, std::v
 class Driver
 {
 public:
-	Driver() : _sim(nullptr), _builder(nullptr), _storage(nullptr), _writeLastState(false), _writeLastStateSens(false)
+	Driver() : _sim(nullptr), _builder(nullptr), _storage(nullptr), _writeLastState(false), _writeLastStateSens(false), _writeSolverStatistics(false)
 	{
 		_builder = cadetCreateModelBuilder();
 	}
@@ -480,6 +480,11 @@ public:
 		else
 			_writeLastStateSens = false;
 
+		if (pp.exists("WRITE_SOLVER_STATISTICS"))
+			_writeSolverStatistics = pp.getBool("WRITE_SOLVER_STATISTICS");
+		else
+			_writeSolverStatistics = false;
+
 		for (int i = 0; i <= _sim->model()->maxUnitOperationId(); ++i)
 		{
 			oss.str("");
@@ -639,6 +644,21 @@ public:
 			writer.popGroup();
 		}
 
+		// Write solver statistics if enabled
+		if (_writeSolverStatistics)
+		{
+			const cadet::SolverStatistics stats = _sim->getSolverStatistics();
+			writer.pushGroup("solver_statistics");
+			writer.scalar<int>("VERSION", 1);  // Schema version for compatibility
+			writer.scalar<long>("NUM_STEPS", stats.numSteps);
+			writer.scalar<long>("NUM_RHS_EVALS", stats.numRhsEvals);
+			writer.scalar<long>("NUM_LINSOL_SETUPS", stats.numLinSolSetups);
+			writer.scalar<long>("NUM_ERR_TEST_FAILS", stats.numErrTestFails);
+			writer.scalar<long>("NUM_NONLIN_CONV_FAILS", stats.numNonlinSolvConvFails);
+			writer.scalar<long>("NUM_NONLIN_ITERS", stats.numNonlinSolvIters);
+			writer.popGroup();
+		}
+
 		writer.popGroup();
 
 		if (writer.exists("meta"))
@@ -743,6 +763,7 @@ protected:
 	std::vector<UnitOpIdx> _writeLastStateUnitId;
 	bool _writeLastStateSens;
 	std::vector<UnitOpIdx> _writeLastStateSensUnitId;
+	bool _writeSolverStatistics;
 
 	/**
 	 * @brief Sets section times and section continuity from the given parameter provider
