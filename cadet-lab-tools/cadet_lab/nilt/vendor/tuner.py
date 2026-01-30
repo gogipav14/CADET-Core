@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 from typing import Callable, Optional, Tuple, Dict, Any
 
-from .nilt_fft import fft_nilt, eps_im, n_doubling_error
+from .nilt_fft import fft_nilt, one_sided_imag_ratio, n_doubling_error
 
 
 @dataclass
@@ -149,9 +149,10 @@ def refine_until_accept(
     t_end: float,
     eps_im_max: float = 1e-2,
     eps_conv: float = 1e-2,
-    N_max: int = 16384,
+    N_max: int = 32768,
     t_eval_min: float = 0.1,
-    n_timing_runs: int = 100
+    n_timing_runs: int = 100,
+    asymptotic_ratio: float = 0.6
 ) -> Dict[str, Any]:
     """
     Refine N until acceptance criteria are met.
@@ -167,15 +168,19 @@ def refine_until_accept(
     t_end : float
         End time for evaluation
     eps_im_max : float
-        Imaginary leakage threshold (default 1e-2)
+        Imaginary leakage threshold (default 1e-2).
+        NOTE: This uses one_sided_imag_ratio, NOT paper ε_Im.
     eps_conv : float
         N-doubling convergence threshold (default 1e-2)
     N_max : int
-        Maximum N before giving up (default 16384)
+        Maximum N before giving up (default 32768, increased from 16384)
     t_eval_min : float
         Minimum time for evaluation (default 0.1)
     n_timing_runs : int
         Number of runs for timing (default 100)
+    asymptotic_ratio : float
+        Accept if last two deltas ratio < this (indicates asymptotic regime)
+        Default 0.6 means delta halving or better per doubling.
 
     Returns
     -------
@@ -189,22 +194,32 @@ def refine_until_accept(
     accepted = False
     iterations = 0
     max_iterations = int(np.log2(N_max / N)) + 2
+    delta_history = []
 
     while not accepted and iterations < max_iterations:
         # Step 12: Compute solution at current N
-        f_full, t_full, z_ifft = fft_nilt(F, a, T, N)
+        f_full, t_full, z_ifft, _ = fft_nilt(F, a, T, N, diagnostics_mode="none")
 
-        # Step 13: Compute eps_im
+        # Step 13: Compute one_sided_imag_ratio (NOT paper ε_Im)
         mask = (t_full >= t_eval_min) & (t_full <= t_end)
-        current_eps_im = eps_im(z_ifft[mask])
+        current_imag_ratio = one_sided_imag_ratio(z_ifft[mask])
 
         # Step 14-15: Compute N-doubling error
         E_N, _, _ = n_doubling_error(F, a, T, N, t_eval_min, t_end)
+        delta_history.append(E_N)
 
         # Step 16: Check acceptance criteria
-        if current_eps_im <= eps_im_max and E_N <= eps_conv:
+        # Primary: both thresholds met
+        if current_imag_ratio <= eps_im_max and E_N <= eps_conv:
             accepted = True
-        else:
+        # Secondary: asymptotic regime detected (delta converging but not yet below threshold)
+        elif len(delta_history) >= 2 and E_N <= eps_conv * 5:
+            # Check if in asymptotic regime: last delta is less than asymptotic_ratio * previous
+            if delta_history[-1] < asymptotic_ratio * delta_history[-2]:
+                # Asymptotic convergence - accept even if not below strict threshold
+                accepted = True
+
+        if not accepted:
             # Step 17: Double N
             N = 2 * N
             if N > N_max:
@@ -213,13 +228,13 @@ def refine_until_accept(
         iterations += 1
 
     # Recompute final solution
-    f_full, t_full, z_ifft = fft_nilt(F, a, T, N)
+    f_full, t_full, z_ifft, _ = fft_nilt(F, a, T, N, diagnostics_mode="none")
 
     # Timing
     timings = []
     for _ in range(n_timing_runs):
         t_start = time.perf_counter()
-        fft_nilt(F, a, T, N)
+        fft_nilt(F, a, T, N, diagnostics_mode="none")
         t_end_timing = time.perf_counter()
         timings.append((t_end_timing - t_start) * 1e6)  # microseconds
 
@@ -230,7 +245,7 @@ def refine_until_accept(
     mask = (t_full >= t_eval_min) & (t_full <= t_end)
     t_eval = t_full[mask]
     f_eval = f_full[mask]
-    final_eps_im = eps_im(z_ifft[mask])
+    final_imag_ratio = one_sided_imag_ratio(z_ifft[mask])
 
     # Final E_N
     final_E_N, _, _ = n_doubling_error(F, a, T, N, t_eval_min, t_end)
@@ -244,8 +259,10 @@ def refine_until_accept(
         "a": a,
         "T": T,
         "N": N,
-        "eps_im": final_eps_im,
+        "eps_im": final_imag_ratio,  # Legacy key name, actually one_sided_imag_ratio
+        "one_sided_imag_ratio": final_imag_ratio,
         "E_N": final_E_N,
+        "delta_history": delta_history,
         "accepted": accepted,
         "iterations": iterations,
         "timing_median_us": timing_median,

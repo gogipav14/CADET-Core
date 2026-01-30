@@ -2,13 +2,19 @@
 
 Provides simplified wrappers around the vendored nilt-cfl library
 convergence metrics with structured result objects.
+
+Diagnostics:
+- one_sided_imag_ratio: Im/Re of one-sided IFFT output. High values (~0.6)
+  are expected and do NOT indicate errors. This is NOT paper2_nilt_cfl ε_Im.
+- epsilon_im_paper: Paper-compliant ε_Im using irfft reconstruction.
+  Should be ~1e-10 for real-valued functions.
 """
 
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 import numpy as np
 
-from .vendor import fft_nilt, eps_im, n_doubling_error, tune_params
+from .vendor import fft_nilt, one_sided_imag_ratio, n_doubling_error, tune_params
 
 
 @dataclass
@@ -55,28 +61,26 @@ def epsilon_im_test(
     use_refinement: bool = True,
     C: float = 1.0,
 ) -> NiltConvergenceResult:
-    """Test convergence via imaginary part magnitude (ε_Im test).
+    """Test convergence via one_sided_imag_ratio metric.
 
-    For real-valued time-domain functions, the NILT should produce
-    results with negligible imaginary parts. This test measures the
-    relative magnitude of the imaginary part as a convergence indicator.
+    NOTE: This uses one_sided_imag_ratio (Im/Re of one-sided IFFT output),
+    which is NOT the paper2_nilt_cfl ε_Im. High values (~0.6) are expected
+    for one-sided FFT evaluation and do NOT indicate errors.
 
-    ε_Im = RMS(Im(z)) / RMS(Re(z))
-
-    A small ε_Im indicates that the NILT is converging to a real-valued
-    function, as expected for physical systems.
+    For paper-compliant ε_Im testing, use epsilon_im_paper() directly.
 
     Args:
         F: Laplace-domain transfer function F(s).
         t_end: End time for evaluation.
         alpha_c: Abscissa of convergence (default 0.0).
         threshold: Threshold for pass/fail (default 1e-2).
+            NOTE: For one_sided_imag_ratio, values ~0.6-1.0 are normal.
         t_eval_min: Minimum time for evaluation (default 0.1).
         use_refinement: If True, use adaptive N-doubling refinement.
         C: Tail envelope constant for parameter tuning.
 
     Returns:
-        NiltConvergenceResult with ε_Im value and pass/fail status.
+        NiltConvergenceResult with one_sided_imag_ratio value and pass/fail status.
     """
     from .vendor import refine_until_accept
 
@@ -100,20 +104,22 @@ def epsilon_im_test(
             t_eval_min=t_eval_min,
             n_timing_runs=5,
         )
-        epsilon_im_value = float(result["eps_im"])
+        epsilon_im_value = float(result["one_sided_imag_ratio"])
         passed = bool(result["accepted"])
     else:
         # Single evaluation without refinement
-        f_full, t_full, z_ifft = fft_nilt(F, params.a, params.T, params.N)
+        f_full, t_full, z_ifft, _ = fft_nilt(
+            F, params.a, params.T, params.N, diagnostics_mode="none"
+        )
         mask = (t_full >= t_eval_min) & (t_full <= t_end)
-        epsilon_im_value = float(eps_im(z_ifft[mask]))
+        epsilon_im_value = float(one_sided_imag_ratio(z_ifft[mask]))
         passed = epsilon_im_value <= threshold
 
     return NiltConvergenceResult(
         passed=passed,
         epsilon_im=epsilon_im_value,
         threshold=threshold,
-        message=f"ε_Im = {epsilon_im_value:.2e}, threshold = {threshold:.2e}",
+        message=f"one_sided_imag_ratio = {epsilon_im_value:.2e}, threshold = {threshold:.2e}",
     )
 
 

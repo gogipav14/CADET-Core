@@ -9,7 +9,9 @@ https://github.com/gogipav14/nilt-cfl
 Key Features:
 - CFL-informed parameter selection (Algorithm 1)
 - FFT-based Dubner-Abate/Hsu-Dranoff NILT
-- ε_Im diagnostic for imaginary leakage detection
+- Two ε_Im diagnostics:
+  - one_sided_imag_ratio: Im/Re of one-sided IFFT (fast, high values normal)
+  - epsilon_im_paper: Paper-compliant ε_Im using irfft (should be ~1e-10)
 - N-doubling convergence test
 - CADET-specific benchmark transfer functions
 """
@@ -18,12 +20,17 @@ Key Features:
 from .vendor import (
     fft_nilt,
     fft_nilt_one_sided,
-    eps_im,
+    # Diagnostics
+    one_sided_imag_ratio,  # Im/Re of one-sided IFFT (NOT paper ε_Im)
+    epsilon_im_paper,       # Paper-compliant ε_Im using irfft
+    eps_im,                 # Deprecated alias for one_sided_imag_ratio
     n_doubling_error,
+    # Parameter tuning
     tune_params,
     refine_until_accept,
     check_cfl_feasibility,
     TunedParams,
+    # Benchmark problems
     get_problem,
     get_all_problems,
     Problem,
@@ -45,15 +52,20 @@ from .benchmarks import (
 )
 
 __all__ = [
-    # Vendored core
+    # Vendored core NILT
     "fft_nilt",
     "fft_nilt_one_sided",
-    "eps_im",
     "n_doubling_error",
+    # Diagnostics (ε_Im)
+    "one_sided_imag_ratio",  # Im/Re of one-sided IFFT (fast, high values normal)
+    "epsilon_im_paper",       # Paper-compliant ε_Im (should be ~1e-10)
+    "eps_im",                 # Deprecated alias
+    # Parameter tuning
     "tune_params",
     "refine_until_accept",
     "check_cfl_feasibility",
     "TunedParams",
+    # Benchmark problems
     "get_problem",
     "get_all_problems",
     "Problem",
