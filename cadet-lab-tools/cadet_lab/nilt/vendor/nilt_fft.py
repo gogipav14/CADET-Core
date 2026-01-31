@@ -84,9 +84,6 @@ def fft_nilt(
     # Evaluate F(s) at Bromwich contour points (includes negative ω for k > N/2)
     G = np.array([F(sk) for sk in s], dtype=np.complex128)
 
-    # Apply trapezoidal weight at DC (k=0 endpoint)
-    G[0] = G[0] * 0.5
-
     # Compute sum via IFFT
     # IFFT: (1/N) * Σ G[k] exp(i 2π k j / N)
     # Our sum: Σ G[k] exp(i ω_k t_j) matches this with DFT-consistent ω
@@ -97,8 +94,8 @@ def fft_nilt(
     eps_im_value = eps_im_max(z_ifft)
 
     # Apply exponential factor, scaling, and extract real part
-    # f(t) = exp(a*t) / T * Re[sum]
-    f = np.exp(a * t) / T * np.real(z_ifft)
+    # f(t) = exp(a*t) / (2*T) * Re[sum]
+    f = np.exp(a * t) / (2 * T) * np.real(z_ifft)
 
     return f, t, z_ifft, eps_im_value
 

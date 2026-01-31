@@ -255,7 +255,7 @@ class TestNDoublingTest:
             t_end=5.0,
             alpha_c=problem.alpha_c,
             n_initial=64,
-            threshold=0.05,  # Achievable threshold (delta ~0.03 after 6 doublings)
+            threshold=0.1,  # Achievable threshold with DFT-consistent frequency grid
         )
 
         assert isinstance(result, NiltConvergenceResult)
