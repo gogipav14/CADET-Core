@@ -14,6 +14,7 @@ from cadet_lab.stress_suite import (
     case_first_step_fail,
     case_sharp_front,
     case_discontinuous_section,
+    case_stiff_binding,
     get_all_stress_cases,
     StressSuiteResult,
     CaseResult,
@@ -222,6 +223,73 @@ class TestCaseDiscontinuousSection:
             np.testing.assert_array_equal(sec1_1, sec1_2)
 
 
+class TestCaseStiffBinding:
+    """Tests for case_stiff_binding generator."""
+
+    def test_creates_valid_hdf5(self, tmp_path):
+        """Generated file is valid HDF5 with expected structure."""
+        output_path = tmp_path / "stiff_binding.h5"
+        result = case_stiff_binding(output_path)
+
+        assert result.exists()
+        with h5py.File(result, "r") as f:
+            assert "input/model" in f
+            assert "input/solver" in f
+            assert "input/return" in f
+
+    def test_high_binding_rate(self, tmp_path):
+        """Default config has high binding rate constants."""
+        output_path = tmp_path / "stiff_binding.h5"
+        case_stiff_binding(output_path)
+
+        with h5py.File(output_path, "r") as f:
+            ka = f["input/model/unit_001/adsorption/LIN_KA"][()]
+            kd = f["input/model/unit_001/adsorption/LIN_KD"][()]
+            # Default ka=1e4, kd=1e2
+            assert float(np.array(ka).flatten()[0]) >= 1e4
+            assert float(np.array(kd).flatten()[0]) >= 1e2
+
+    def test_custom_binding_rates(self, tmp_path):
+        """Custom binding rates are applied."""
+        output_path = tmp_path / "stiff_binding.h5"
+        case_stiff_binding(output_path, binding_ka=1e5, binding_kd=1e3)
+
+        with h5py.File(output_path, "r") as f:
+            ka = f["input/model/unit_001/adsorption/LIN_KA"][()]
+            kd = f["input/model/unit_001/adsorption/LIN_KD"][()]
+            assert float(np.array(ka).flatten()[0]) == pytest.approx(1e5)
+            assert float(np.array(kd).flatten()[0]) == pytest.approx(1e3)
+
+    def test_tight_tolerances(self, tmp_path):
+        """Config uses tight tolerances for stiff system."""
+        output_path = tmp_path / "stiff_binding.h5"
+        case_stiff_binding(output_path)
+
+        with h5py.File(output_path, "r") as f:
+            abstol = f["input/solver/time_integrator/ABSTOL"][()]
+            reltol = f["input/solver/time_integrator/RELTOL"][()]
+            # Expect tight tolerances: abstol=1e-10, reltol=1e-8
+            assert abstol <= 1e-9
+            assert reltol <= 1e-7
+
+    def test_deterministic_generation(self, tmp_path):
+        """Same inputs produce identical files."""
+        output1 = tmp_path / "stiff_binding_1.h5"
+        output2 = tmp_path / "stiff_binding_2.h5"
+
+        case_stiff_binding(output1, binding_ka=5e4, binding_kd=5e2)
+        case_stiff_binding(output2, binding_ka=5e4, binding_kd=5e2)
+
+        with h5py.File(output1, "r") as f1, h5py.File(output2, "r") as f2:
+            ka1 = f1["input/model/unit_001/adsorption/LIN_KA"][()]
+            ka2 = f2["input/model/unit_001/adsorption/LIN_KA"][()]
+            np.testing.assert_array_equal(ka1, ka2)
+
+            abstol1 = f1["input/solver/time_integrator/ABSTOL"][()]
+            abstol2 = f2["input/solver/time_integrator/ABSTOL"][()]
+            assert abstol1 == abstol2
+
+
 class TestGetAllStressCases:
     """Tests for get_all_stress_cases registry."""
 
@@ -229,7 +297,7 @@ class TestGetAllStressCases:
         """Returns a list of case definitions."""
         cases = get_all_stress_cases()
         assert isinstance(cases, list)
-        assert len(cases) == 3
+        assert len(cases) == 4
 
     def test_case_structure(self):
         """Each case is a tuple of (name, func, kwargs)."""
@@ -248,6 +316,7 @@ class TestGetAllStressCases:
         assert "first_step_fail" in names
         assert "sharp_front" in names
         assert "discontinuous_section" in names
+        assert "stiff_binding" in names
 
     def test_all_cases_callable(self, tmp_path):
         """All registered generators can produce files."""

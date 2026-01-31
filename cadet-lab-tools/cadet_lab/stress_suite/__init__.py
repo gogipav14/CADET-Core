@@ -7,6 +7,7 @@ from .cases import (
     case_first_step_fail,
     case_sharp_front,
     case_discontinuous_section,
+    case_stiff_binding,
     get_all_stress_cases,
 )
 from .runner import (
@@ -20,6 +21,7 @@ __all__ = [
     "case_first_step_fail",
     "case_sharp_front",
     "case_discontinuous_section",
+    "case_stiff_binding",
     "get_all_stress_cases",
     "run_stress_suite",
     "run_single_case",

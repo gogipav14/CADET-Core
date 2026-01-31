@@ -174,6 +174,49 @@ def case_discontinuous_section(
     return output_path
 
 
+def case_stiff_binding(
+    output_path: Union[str, Path],
+    binding_ka: float = 1e4,  # Very fast adsorption
+    binding_kd: float = 1e2,  # Fast desorption too
+    film_diffusion: float = 1e-3,  # High mass transfer
+    **kwargs,
+) -> Path:
+    """Generate a case with very stiff binding kinetics.
+
+    This configuration creates a system with extremely fast binding kinetics
+    (high ka, kd) that stresses the Newton-Krylov solver due to high stiffness
+    in the ODE system from rapid equilibration timescales.
+
+    The large ka/kd values create eigenvalues with very different magnitudes,
+    requiring more Newton iterations and potentially causing convergence issues.
+
+    Args:
+        output_path: Path where HDF5 file will be written.
+        binding_ka: Adsorption rate constant (default 1e4, very fast).
+        binding_kd: Desorption rate constant (default 1e2, fast).
+        film_diffusion: Film diffusion coefficient (default 1e-3, high).
+        **kwargs: Additional arguments passed to create_minimal_grm_config.
+
+    Returns:
+        Path to created HDF5 file.
+    """
+    # Set defaults for a stiff but solvable problem
+    kwargs.setdefault("n_times", 51)
+    kwargs.setdefault("end_time", 50.0)  # Long enough to see equilibration
+    kwargs.setdefault("abstol", 1e-10)  # Tighter tolerances for stiff system
+    kwargs.setdefault("reltol", 1e-8)
+    kwargs.setdefault("init_step_size", 1e-8)  # Small initial step for stiff system
+    kwargs.setdefault("velocity", 1e-4)  # Slow flow to emphasize binding dynamics
+
+    return create_minimal_grm_config(
+        output_path=output_path,
+        binding_ka=binding_ka,
+        binding_kd=binding_kd,
+        film_diffusion=film_diffusion,
+        **kwargs,
+    )
+
+
 def get_all_stress_cases() -> list:
     """Return list of all available stress case generators.
 
@@ -184,4 +227,5 @@ def get_all_stress_cases() -> list:
         ("first_step_fail", case_first_step_fail, {"init_step_size": 1.0}),
         ("sharp_front", case_sharp_front, {"peclet": 1000.0, "n_col": 8}),
         ("discontinuous_section", case_discontinuous_section, {"pulse_duration": 1.0}),
+        ("stiff_binding", case_stiff_binding, {"binding_ka": 1e4, "binding_kd": 1e2}),
     ]
