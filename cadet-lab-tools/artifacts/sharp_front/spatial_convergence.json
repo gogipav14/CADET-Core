@@ -1,0 +1,35 @@
+{
+  "case_name": "sharp_front",
+  "convergence_achieved": true,
+  "refinement_levels": 1,
+  "threshold": 0.001,
+  "require_trend_decrease": true,
+  "max_refinement_levels": 3,
+  "convergence_history": [
+    {
+      "level": 1,
+      "refinement_factor": 2,
+      "baseline_resolution": {
+        "nelem_col": 8,
+        "nelem_par": null
+      },
+      "refined_resolution": {
+        "nelem_col": 16,
+        "nelem_par": null
+      },
+      "linf_delta": 5.551115123125783e-17,
+      "scaled_rms_delta": 5.522792316967191e-12,
+      "threshold_met": true
+    }
+  ],
+  "final_linf_delta": 5.551115123125783e-17,
+  "final_scaled_rms_delta": 5.522792316967191e-12,
+  "baseline_resolution": {
+    "nelem_col": 8,
+    "nelem_par": null
+  },
+  "recommended_resolution": {
+    "nelem_col": 16,
+    "nelem_par": null
+  }
+}

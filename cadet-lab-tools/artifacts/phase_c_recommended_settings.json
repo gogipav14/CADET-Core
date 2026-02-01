@@ -1,0 +1,70 @@
+{
+  "metadata": {
+    "gates": {
+      "scaled_rms_global": 1.0,
+      "max_err_test_fails": 10
+    },
+    "timestamp": "2026-02-01T13:57:15.226180"
+  },
+  "phase_d_decision": {
+    "triggered": false,
+    "reasons": [],
+    "notes": "No Phase D triggers detected. Step advisor successfully handles err_test_fails. No solver work warranted at this time."
+  },
+  "first_step_fail": {
+    "abstol": 3e-08,
+    "reltol": 3e-05,
+    "expected_steps": 69,
+    "accuracy": {
+      "scaled_rms_error": 0.2127378400161745,
+      "linf_error": 6.595312618054572e-07
+    },
+    "solver_stats": {
+      "num_err_test_fails": 5,
+      "num_conv_fails": 0,
+      "wall_time": 0.01550918900011311
+    }
+  },
+  "sharp_front": {
+    "abstol": 3e-08,
+    "reltol": 3e-05,
+    "expected_steps": 114,
+    "accuracy": {
+      "scaled_rms_error": 0.18228914716201355,
+      "linf_error": 5.671066349299814e-06
+    },
+    "solver_stats": {
+      "num_err_test_fails": 0,
+      "num_conv_fails": 0,
+      "wall_time": 0.016907494000406587
+    }
+  },
+  "discontinuous_section": {
+    "abstol": 1e-08,
+    "reltol": 3e-05,
+    "expected_steps": 67,
+    "accuracy": {
+      "scaled_rms_error": 0.2374472745443533,
+      "linf_error": 1.1757639941621656e-06
+    },
+    "solver_stats": {
+      "num_err_test_fails": 1,
+      "num_conv_fails": 0,
+      "wall_time": 0.017117981999945187
+    }
+  },
+  "stiff_binding": {
+    "abstol": 3e-08,
+    "reltol": 3e-05,
+    "expected_steps": 69,
+    "accuracy": {
+      "scaled_rms_error": 0.05916365596116296,
+      "linf_error": 1.0112265115330352e-07
+    },
+    "solver_stats": {
+      "num_err_test_fails": 1,
+      "num_conv_fails": 0,
+      "wall_time": 0.01582745499945304
+    }
+  }
+}

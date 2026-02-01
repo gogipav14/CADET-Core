@@ -1,0 +1,16 @@
+{
+  "case_name": "first_step_fail",
+  "convergence_achieved": true,
+  "refinement_levels": 1,
+  "threshold": 0.01,
+  "baseline_resolution": {
+    "nelem_col": null,
+    "nelem_par": null
+  },
+  "recommended_resolution": {
+    "nelem_col": null,
+    "nelem_par": null
+  },
+  "final_linf_delta": 5.095750210681871e-18,
+  "final_scaled_rms_delta": 6.355078804697398e-13
+}
