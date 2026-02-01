@@ -179,10 +179,13 @@ struct CADET_API SolverStatistics
 	long numErrTestFails;         //!< Total number of local error test failures
 	long numNonlinSolvConvFails;  //!< Total number of nonlinear solver convergence failures
 	long numNonlinSolvIters;      //!< Total number of nonlinear solver iterations
+	long numLinIters;             //!< Total number of linear solver iterations (Phase D)
+	long numGmresRestarts;        //!< Total number of GMRES restarts (Phase D)
 
 	SolverStatistics() CADET_NOEXCEPT
 		: numSteps(0), numRhsEvals(0), numLinSolSetups(0),
-		  numErrTestFails(0), numNonlinSolvConvFails(0), numNonlinSolvIters(0)
+		  numErrTestFails(0), numNonlinSolvConvFails(0), numNonlinSolvIters(0),
+		  numLinIters(0), numGmresRestarts(0)
 	{ }
 };
 

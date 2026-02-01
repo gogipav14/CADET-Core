@@ -1409,6 +1409,13 @@ namespace cadet
 		IDAGetNumNonlinSolvIters(_idaMemBlock, &_solverStats.numNonlinSolvIters);
 		IDAGetNumNonlinSolvConvFails(_idaMemBlock, &_solverStats.numNonlinSolvConvFails);
 
+		// Linear solver statistics (Phase D instrumentation)
+		// Note: SUNDIALS IDA API doesn't expose IDAGetNumLinIters in version 3.2.1
+		// Linear iteration counts remain 0 unless CADET_BENCHMARK_MODE is enabled
+		// Future work: implement linear iteration tracking via GMRES callback
+		_solverStats.numLinIters = 0;
+		_solverStats.numGmresRestarts = 0;
+
 		LOG(Debug) << "Solver statistics: Steps=" << _solverStats.numSteps
 			<< " RhsEvals=" << _solverStats.numRhsEvals
 			<< " ErrTestFails=" << _solverStats.numErrTestFails

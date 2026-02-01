@@ -649,13 +649,15 @@ public:
 		{
 			const cadet::SolverStatistics stats = _sim->getSolverStatistics();
 			writer.pushGroup("solver_statistics");
-			writer.scalar<int>("VERSION", 1);  // Schema version for compatibility
-			writer.scalar<long>("NUM_STEPS", stats.numSteps);
-			writer.scalar<long>("NUM_RHS_EVALS", stats.numRhsEvals);
-			writer.scalar<long>("NUM_LINSOL_SETUPS", stats.numLinSolSetups);
-			writer.scalar<long>("NUM_ERR_TEST_FAILS", stats.numErrTestFails);
-			writer.scalar<long>("NUM_NONLIN_CONV_FAILS", stats.numNonlinSolvConvFails);
-			writer.scalar<long>("NUM_NONLIN_ITERS", stats.numNonlinSolvIters);
+			writer.template scalar<int>("VERSION", 1);  // Schema version for compatibility
+			writer.template scalar<int>("NUM_STEPS", static_cast<int>(stats.numSteps));
+			writer.template scalar<int>("NUM_RHS_EVALS", static_cast<int>(stats.numRhsEvals));
+			writer.template scalar<int>("NUM_LINSOL_SETUPS", static_cast<int>(stats.numLinSolSetups));
+			writer.template scalar<int>("NUM_ERR_TEST_FAILS", static_cast<int>(stats.numErrTestFails));
+			writer.template scalar<int>("NUM_NONLIN_CONV_FAILS", static_cast<int>(stats.numNonlinSolvConvFails));
+			writer.template scalar<int>("NUM_NONLIN_ITERS", static_cast<int>(stats.numNonlinSolvIters));
+			writer.template scalar<int>("NUM_LIN_ITERS", static_cast<int>(stats.numLinIters));
+			writer.template scalar<int>("NUM_GMRES_RESTARTS", static_cast<int>(stats.numGmresRestarts));
 			writer.popGroup();
 		}
 

@@ -1,0 +1,86 @@
+{
+  "timestamp": "2026-02-01T01:54:17.944556",
+  "total_cases": 4,
+  "passed": 4,
+  "failed": 0,
+  "failure_rate": 0.0,
+  "median_wall_time": 0.039147476499977074,
+  "median_err_test_fails": 2.0,
+  "median_conv_fails": 0.0,
+  "case_results": {
+    "first_step_fail": {
+      "name": "first_step_fail",
+      "success": true,
+      "return_code": 0,
+      "wall_time": 0.03121535100001438,
+      "failure_reason": null,
+      "num_steps": 148,
+      "num_err_test_fails": 9,
+      "num_conv_fails": 0,
+      "input_file": "artifacts/stress_suite_baseline/first_step_fail_input.h5",
+      "output_file": "artifacts/stress_suite_baseline/first_step_fail_input_output.h5"
+    },
+    "sharp_front": {
+      "name": "sharp_front",
+      "success": true,
+      "return_code": 0,
+      "wall_time": 0.038134412999966116,
+      "failure_reason": null,
+      "num_steps": 232,
+      "num_err_test_fails": 0,
+      "num_conv_fails": 0,
+      "input_file": "artifacts/stress_suite_baseline/sharp_front_input.h5",
+      "output_file": "artifacts/stress_suite_baseline/sharp_front_input_output.h5"
+    },
+    "discontinuous_section": {
+      "name": "discontinuous_section",
+      "success": true,
+      "return_code": 0,
+      "wall_time": 0.04016053999998803,
+      "failure_reason": null,
+      "num_steps": 153,
+      "num_err_test_fails": 1,
+      "num_conv_fails": 0,
+      "input_file": "artifacts/stress_suite_baseline/discontinuous_section_input.h5",
+      "output_file": "artifacts/stress_suite_baseline/discontinuous_section_input_output.h5"
+    },
+    "stiff_binding": {
+      "name": "stiff_binding",
+      "success": true,
+      "return_code": 0,
+      "wall_time": 0.04812984199998027,
+      "failure_reason": null,
+      "num_steps": 365,
+      "num_err_test_fails": 3,
+      "num_conv_fails": 0,
+      "input_file": "artifacts/stress_suite_baseline/stiff_binding_input.h5",
+      "output_file": "artifacts/stress_suite_baseline/stiff_binding_input_output.h5"
+    }
+  },
+  "full_state_metrics": {
+    "first_step_fail": {
+      "has_bulk": true,
+      "has_particle": false,
+      "has_solid": false,
+      "has_coordinates": false
+    },
+    "sharp_front": {
+      "has_bulk": true,
+      "has_particle": false,
+      "has_solid": false,
+      "has_coordinates": false
+    },
+    "discontinuous_section": {
+      "has_bulk": true,
+      "has_particle": false,
+      "has_solid": false,
+      "has_coordinates": false
+    },
+    "stiff_binding": {
+      "has_bulk": true,
+      "has_particle": false,
+      "has_solid": false,
+      "has_coordinates": false
+    }
+  }
+}

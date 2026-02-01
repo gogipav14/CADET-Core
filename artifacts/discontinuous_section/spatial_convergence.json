@@ -1,0 +1,16 @@
+{
+  "case_name": "discontinuous_section",
+  "convergence_achieved": false,
+  "refinement_levels": 1,
+  "threshold": 0.01,
+  "baseline_resolution": {
+    "nelem_col": 8,
+    "nelem_par": 1
+  },
+  "recommended_resolution": {
+    "nelem_col": 16,
+    "nelem_par": 2
+  },
+  "final_linf_delta": 0.2879439103858783,
+  "final_scaled_rms_delta": 15934.426748575317
+}

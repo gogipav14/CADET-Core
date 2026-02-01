@@ -1,0 +1,28 @@
+
+================================================================================
+Running production sweep for first_step_fail
+================================================================================
+
+Step 1: Generating time-mode reference (tol_factor=100.0)...
+Traceback (most recent call last):
+  File "/home/gogip/github_repos/CADET-Core/cadet-lab-tools/scripts/run_production_sweeps.py", line 138, in <module>
+    main()
+  File "/home/gogip/github_repos/CADET-Core/cadet-lab-tools/scripts/run_production_sweeps.py", line 95, in main
+    reference_output = run_reference(
+                       ^^^^^^^^^^^^^^
+  File "/home/gogip/github_repos/CADET-Core/cadet-lab-tools/cadet_lab/validation/reference_protocol.py", line 211, in run_reference
+    raise RuntimeError(
+RuntimeError: Reference simulation failed with return code 2. Failure reason: NONZERO_EXIT_2. Reference solutions must succeed to establish ground truth.
+
+################################################################################
+# Phase C Operationalization - Master Workflow
+# Started: 2026-01-31T20:40:04.785023
+################################################################################
+
+================================================================================
+Step 1: Production Work-Precision Sweeps (4 cases × 16 points)
+================================================================================
+Command: /usr/bin/python3 /home/gogip/github_repos/CADET-Core/cadet-lab-tools/scripts/run_production_sweeps.py --cadet-cli /home/gogip/github_repos/CADET-Core/install/bin/cadet-cli --output-dir artifacts
+
+
+❌ ERROR: Step 1: Production Work-Precision Sweeps (4 cases × 16 points) failed with return code 1

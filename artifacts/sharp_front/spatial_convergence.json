@@ -1,0 +1,65 @@
+{
+  "case_name": "sharp_front",
+  "convergence_achieved": false,
+  "refinement_levels": 3,
+  "threshold": 0.001,
+  "require_trend_decrease": true,
+  "max_refinement_levels": 3,
+  "convergence_history": [
+    {
+      "level": 1,
+      "refinement_factor": 2,
+      "baseline_resolution": {
+        "nelem_col": 8,
+        "nelem_par": 1
+      },
+      "refined_resolution": {
+        "nelem_col": 16,
+        "nelem_par": 2
+      },
+      "linf_delta": 0.38336732745706487,
+      "scaled_rms_delta": 25298.690610224185,
+      "threshold_met": false
+    },
+    {
+      "level": 2,
+      "refinement_factor": 4,
+      "baseline_resolution": {
+        "nelem_col": 8,
+        "nelem_par": 1
+      },
+      "refined_resolution": {
+        "nelem_col": 32,
+        "nelem_par": 4
+      },
+      "linf_delta": 0.3628048808915802,
+      "scaled_rms_delta": 26465.33371918732,
+      "threshold_met": false
+    },
+    {
+      "level": 3,
+      "refinement_factor": 8,
+      "baseline_resolution": {
+        "nelem_col": 8,
+        "nelem_par": 1
+      },
+      "refined_resolution": {
+        "nelem_col": 64,
+        "nelem_par": 8
+      },
+      "linf_delta": 0.3587288316031095,
+      "scaled_rms_delta": 25526.60201883886,
+      "threshold_met": false
+    }
+  ],
+  "final_linf_delta": 0.3587288316031095,
+  "final_scaled_rms_delta": 25526.60201883886,
+  "baseline_resolution": {
+    "nelem_col": 8,
+    "nelem_par": 1
+  },
+  "recommended_resolution": {
+    "nelem_col": 64,
+    "nelem_par": 8
+  }
+}

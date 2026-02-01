@@ -1,0 +1,137 @@
+
+================================================================================
+Running production sweep for first_step_fail
+================================================================================
+
+Step 1: Generating time-mode reference (tol_factor=100.0)...
+Reference generated: artifacts/first_step_fail/reference/reference_time_output.h5
+
+Step 2: Running 4×4 tolerance sweep (4×4 = 16 points)...
+
+Artifact saved: artifacts/first_step_fail/work_precision_full_state.json
+
+Summary for first_step_fail:
+  Total points: 16
+  Successful: 16
+  Failed: 0
+  Average steps (successful): 138.4
+
+================================================================================
+Running production sweep for sharp_front
+================================================================================
+
+Step 1: Generating time-mode reference (tol_factor=100.0)...
+Reference generated: artifacts/sharp_front/reference/reference_time_output.h5
+
+Step 2: Running 4×4 tolerance sweep (4×4 = 16 points)...
+
+Artifact saved: artifacts/sharp_front/work_precision_full_state.json
+
+Summary for sharp_front:
+  Total points: 16
+  Successful: 16
+  Failed: 0
+  Average steps (successful): 452.1
+
+================================================================================
+Running production sweep for discontinuous_section
+================================================================================
+
+Step 1: Generating time-mode reference (tol_factor=100.0)...
+Reference generated: artifacts/discontinuous_section/reference/reference_time_output.h5
+
+Step 2: Running 4×4 tolerance sweep (4×4 = 16 points)...
+
+Artifact saved: artifacts/discontinuous_section/work_precision_full_state.json
+
+Summary for discontinuous_section:
+  Total points: 16
+  Successful: 16
+  Failed: 0
+  Average steps (successful): 138.0
+
+================================================================================
+Running production sweep for stiff_binding
+================================================================================
+
+Step 1: Generating time-mode reference (tol_factor=100.0)...
+Reference generated: artifacts/stiff_binding/reference/reference_time_output.h5
+
+Step 2: Running 4×4 tolerance sweep (4×4 = 16 points)...
+
+Artifact saved: artifacts/stiff_binding/work_precision_full_state.json
+
+Summary for stiff_binding:
+  Total points: 16
+  Successful: 16
+  Failed: 0
+  Average steps (successful): 168.1
+
+================================================================================
+Running spatial convergence check for first_step_fail
+================================================================================
+
+Mode: Single 2× refinement check
+Threshold: 1.000000e-02
+
+Artifact saved: artifacts/first_step_fail/spatial_convergence.json
+
+Summary for first_step_fail:
+  Convergence achieved: False
+  Refinement levels: 1
+  Final scaled RMS delta: 2.414688e+04
+  Threshold: 1.000000e-02
+
+================================================================================
+Running spatial convergence check for sharp_front
+================================================================================
+
+Mode: Iterative resolution finder
+Threshold: 1.000000e-03
+Max refinement levels: 3
+
+  Refinement level 1: factor=2×
+    Scaled RMS delta: 2.529869e+04
+    Threshold: 1.000000e-03
+    Threshold met: False
+
+  Refinement level 2: factor=4×
+    Scaled RMS delta: 2.646533e+04
+    Threshold: 1.000000e-03
+    Threshold met: False
+    Trend decreasing: False (prev=2.529869e+04, current=2.646533e+04)
+
+  Refinement level 3: factor=8×
+Traceback (most recent call last):
+  File "/home/gogip/github_repos/CADET-Core/cadet-lab-tools/scripts/run_spatial_convergence.py", line 260, in <module>
+    main()
+  File "/home/gogip/github_repos/CADET-Core/cadet-lab-tools/scripts/run_spatial_convergence.py", line 207, in main
+    result = run_iterative_spatial_refinement(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gogip/github_repos/CADET-Core/cadet-lab-tools/scripts/run_spatial_convergence.py", line 75, in run_iterative_spatial_refinement
+    result = run_spatial_convergence_check(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gogip/github_repos/CADET-Core/cadet-lab-tools/cadet_lab/validation/spatial_convergence.py", line 253, in run_spatial_convergence_check
+    raise RuntimeError(
+RuntimeError: Refined simulation failed: NONZERO_EXIT_2
+
+################################################################################
+# Phase C Operationalization - Master Workflow
+# Started: 2026-01-31T20:54:03.528571
+################################################################################
+
+================================================================================
+Step 1: Production Work-Precision Sweeps (4 cases × 16 points)
+================================================================================
+Command: /usr/bin/python3 /home/gogip/github_repos/CADET-Core/cadet-lab-tools/scripts/run_production_sweeps.py --cadet-cli /home/gogip/github_repos/CADET-Core/install/bin/cadet-cli --output-dir artifacts
+
+
+✓ Step 1: Production Work-Precision Sweeps (4 cases × 16 points) completed successfully
+
+================================================================================
+Step 2: Spatial Convergence Checks (with iterative refinement)
+================================================================================
+Command: /usr/bin/python3 /home/gogip/github_repos/CADET-Core/cadet-lab-tools/scripts/run_spatial_convergence.py --cadet-cli /home/gogip/github_repos/CADET-Core/install/bin/cadet-cli --output-dir artifacts
+
+
+❌ ERROR: Step 2: Spatial Convergence Checks (with iterative refinement) failed with return code 1
