@@ -34,9 +34,8 @@ int gmresCallback(void* userData, N_Vector v, N_Vector z)
 {
 	Gmres* const g = static_cast<Gmres*>(userData);
 
-#ifdef CADET_BENCHMARK_MODE
+	// Track iterations for performance instrumentation (Phase D)
 	++g->_numIter;
-#endif
 
 	Gmres::MatrixVectorMultFun callback = g->matrixVectorMultiplier();
 	return callback(g->userData(), NVEC_DATA(v), NVEC_DATA(z));
@@ -48,11 +47,9 @@ Gmres::Gmres() CADET_NOEXCEPT :
 #elif CADET_SUNDIALS_IFACE == 3
 	_linearSolver(nullptr),
 #endif
-	_ortho(Orthogonalization::ModifiedGramSchmidt), _maxRestarts(0), _matrixSize(0), _matVecMul(nullptr), _userData(nullptr)
+	_ortho(Orthogonalization::ModifiedGramSchmidt), _maxRestarts(0), _matrixSize(0), _matVecMul(nullptr), _userData(nullptr),
+	_numIter(0)  // Initialize iteration counter (Phase D instrumentation)
 {
-#ifdef CADET_BENCHMARK_MODE
-	_numIter = 0;
-#endif
 }
 
 Gmres::~Gmres() CADET_NOEXCEPT

@@ -191,7 +191,7 @@ public:
 			_timerFactorizePar.totalElapsedTime(),
 			_timerMatVec.totalElapsedTime(),
 			_timerGmres.totalElapsedTime(),
-			static_cast<double>(_gmres.numIterations())
+			0.0  // ColumnModel1D doesn't use GMRES (uses direct factorization)
 		});
 	}
 

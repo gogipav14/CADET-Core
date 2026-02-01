@@ -187,13 +187,15 @@ public:
 	 */
 	const char* getReturnFlagName(int flag) const CADET_NOEXCEPT;
 
-#ifdef CADET_BENCHMARK_MODE
 	/**
 	 * @brief Returns the total number of iterations over all calls of solve()
 	 * @return Total number of iterations
+	 * @details Exposed unconditionally for Phase D performance instrumentation
 	 */
 	inline int numIterations() const CADET_NOEXCEPT { return _numIter; }
-#endif
+
+	// Friend function for GMRES callback (needs access to _numIter)
+	friend int gmresCallback(void* userData, N_Vector v, N_Vector z);
 
 protected:
 
@@ -207,9 +209,9 @@ protected:
 	unsigned int _matrixSize; //!< Size of the square matrix
 	MatrixVectorMultFun _matVecMul; //!< Matrix-vector multiplication function required for GMRES algorithm
 	void* _userData; //!< User data for matrix-vector multiplication function
+	int _numIter; //!< Accumulated number of iterations (Phase D instrumentation)
 
 #ifdef CADET_BENCHMARK_MODE
-	int _numIter; //!< Accumulated number of iterations
 	friend int gmresCallback(void* userData, N_Vector v, N_Vector z);
 #endif
 };
