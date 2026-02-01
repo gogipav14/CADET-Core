@@ -1,0 +1,11 @@
+{
+  "baseline_runtime": 0.10514888699981384,
+  "large_runtime": 1.592974088001938,
+  "spatial_scaling_factor": 64.0,
+  "observed_time_scaling": 15.149699948842619,
+  "step_scaling": 1.2408759124087592,
+  "time_per_step_baseline": 0.0007675101240862324,
+  "time_per_step_large": 0.009370435811776106,
+  "bottleneck": "overhead",
+  "recommendation": "Runtime dominated by overhead (I/O, setup). Solver optimization unlikely to help at this problem scale."
+}

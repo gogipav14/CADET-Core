@@ -1,0 +1,26 @@
+{
+  "case_name": "first_step_fail",
+  "spatial_resolution": {
+    "nelem_col": 32,
+    "nelem_par": 4,
+    "state_dimension_estimate": 512
+  },
+  "tolerances": {
+    "abstol": 3e-08,
+    "reltol": 3e-05
+  },
+  "performance": {
+    "wall_time": 0.2333183500013547,
+    "num_steps": 118,
+    "num_nonlin_iters": 236,
+    "num_err_test_fails": 8,
+    "num_conv_fails": 0
+  },
+  "derived_metrics": {
+    "wall_time_per_step": 0.0019772741525538534,
+    "reject_ratio": 0.06779661016949153
+  },
+  "success": true,
+  "failure_reason": null,
+  "timestamp": "2026-02-01T09:28:05.309271"
+}

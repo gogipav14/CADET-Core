@@ -1,0 +1,26 @@
+{
+  "case_name": "discontinuous_section",
+  "spatial_resolution": {
+    "nelem_col": 8,
+    "nelem_par": 1,
+    "state_dimension_estimate": 32
+  },
+  "tolerances": {
+    "abstol": 3e-08,
+    "reltol": 3e-05
+  },
+  "performance": {
+    "wall_time": 0.03260090699768625,
+    "num_steps": 110,
+    "num_nonlin_iters": 220,
+    "num_err_test_fails": 0,
+    "num_conv_fails": 0
+  },
+  "derived_metrics": {
+    "wall_time_per_step": 0.00029637188179714775,
+    "reject_ratio": 0.0
+  },
+  "success": true,
+  "failure_reason": null,
+  "timestamp": "2026-02-01T09:28:13.142674"
+}

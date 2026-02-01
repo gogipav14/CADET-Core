@@ -74,9 +74,11 @@ def run_scaled_benchmark(
 
     # Build case configuration
     case_generator = CASE_GENERATORS[case_name]
-    case_kwargs = {
-        "n_col": nelem,  # Case generators support this parameter
-    }
+    case_kwargs = {}
+
+    # Only sharp_front supports n_col parameter directly
+    if case_name == "sharp_front":
+        case_kwargs["n_col"] = nelem
 
     # Apply Phase C recommended tolerances if available
     if recommended_settings:
@@ -89,8 +91,16 @@ def run_scaled_benchmark(
     config_path = output_dir / f"{case_name}_n{nelem}_p{par_nelem}_config.h5"
     case_generator(output_path=config_path, **case_kwargs)
 
-    # Modify PAR_NELEM in HDF5 file (case generators don't support this parameter yet)
+    # Modify NELEM and PAR_NELEM in HDF5 file
     with h5py.File(config_path, "r+") as f:
+        # Modify column discretization (NELEM)
+        if case_name != "sharp_front":  # sharp_front already sets this
+            disc = f["input/model/unit_001/discretization"]
+            if "NELEM" in disc:
+                del disc["NELEM"]
+            disc.create_dataset("NELEM", data=nelem)
+
+        # Modify particle discretization (PAR_NELEM) - all cases need this
         par_disc = f["input/model/unit_001/particle_type_000/discretization"]
         if "PAR_NELEM" in par_disc:
             del par_disc["PAR_NELEM"]

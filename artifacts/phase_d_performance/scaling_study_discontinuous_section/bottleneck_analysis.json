@@ -1,0 +1,11 @@
+{
+  "baseline_runtime": 0.03260090699768625,
+  "large_runtime": 2.2099028669981635,
+  "spatial_scaling_factor": 64.0,
+  "observed_time_scaling": 67.78654554472992,
+  "step_scaling": 1.2636363636363637,
+  "time_per_step_baseline": 0.00029637188179714775,
+  "time_per_step_large": 0.015898581776965206,
+  "bottleneck": "expected_scaling",
+  "recommendation": "Scaling is near-quadratic (67.8\u00d7 vs 64.0\u00d7 expected). Solver is performing reasonably. Preconditioning may still provide modest gains."
+}

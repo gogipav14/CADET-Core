@@ -1,0 +1,26 @@
+{
+  "case_name": "stiff_binding",
+  "spatial_resolution": {
+    "nelem_col": 8,
+    "nelem_par": 1,
+    "state_dimension_estimate": 32
+  },
+  "tolerances": {
+    "abstol": 1e-08,
+    "reltol": 3e-05
+  },
+  "performance": {
+    "wall_time": 0.10514888699981384,
+    "num_steps": 137,
+    "num_nonlin_iters": 274,
+    "num_err_test_fails": 1,
+    "num_conv_fails": 0
+  },
+  "derived_metrics": {
+    "wall_time_per_step": 0.0007675101240862324,
+    "reject_ratio": 0.0072992700729927005
+  },
+  "success": true,
+  "failure_reason": null,
+  "timestamp": "2026-02-01T09:27:50.930201"
+}
