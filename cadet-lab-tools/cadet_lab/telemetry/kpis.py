@@ -27,6 +27,8 @@ class RunKPIs:
         num_rhs_evals: Total number of RHS evaluations.
         num_err_test_fails: Number of error test failures.
         num_conv_fails: Number of convergence failures.
+        num_lin_iters: Total linear solver iterations (None if not available).
+        num_gmres_restarts: Total GMRES restarts (None if not available).
         reject_ratio: Ratio of rejected steps to total steps.
         profile_norms: Dictionary of norm values for each outlet profile.
     """
@@ -40,6 +42,8 @@ class RunKPIs:
     num_rhs_evals: Optional[int] = None
     num_err_test_fails: Optional[int] = None
     num_conv_fails: Optional[int] = None
+    num_lin_iters: Optional[int] = None  # Total linear solver iterations
+    num_gmres_restarts: Optional[int] = None  # GMRES restarts
     reject_ratio: Optional[float] = None
     profile_norms: Dict[str, Dict[str, float]] = field(default_factory=dict)
 
@@ -91,8 +95,12 @@ def compute_kpis(
     num_steps = solver_stats.get("NUM_STEPS")
     num_rhs_evals = solver_stats.get("NUM_RHS_EVALS")
     num_err_test_fails = solver_stats.get("NUM_ERR_TEST_FAILS")
-    # Handle both old and new naming conventions
-    num_conv_fails = solver_stats.get("NUM_NONLIN_CONV_FAILS") or solver_stats.get("NUM_CONV_FAILS")
+    # Handle both old and new naming conventions (avoid `or` since 0 is falsy)
+    num_conv_fails = solver_stats.get("NUM_NONLIN_CONV_FAILS")
+    if num_conv_fails is None:
+        num_conv_fails = solver_stats.get("NUM_CONV_FAILS")
+    num_lin_iters = solver_stats.get("NUM_LIN_ITERS")
+    num_gmres_restarts = solver_stats.get("NUM_GMRES_RESTARTS")
 
     # Compute reject ratio
     reject_ratio = None
@@ -115,6 +123,8 @@ def compute_kpis(
         num_rhs_evals=num_rhs_evals,
         num_err_test_fails=num_err_test_fails,
         num_conv_fails=num_conv_fails,
+        num_lin_iters=num_lin_iters,
+        num_gmres_restarts=num_gmres_restarts,
         reject_ratio=reject_ratio,
         profile_norms=profile_norms,
     )

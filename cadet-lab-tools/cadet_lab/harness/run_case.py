@@ -118,14 +118,19 @@ def run_case(
     if output_dir != input_file.parent:
         import shutil
         shutil.copy2(input_file, output_file)
-        run_file = output_file
+        run_file = input_file  # Input for cadet-cli
     else:
-        # Run in place - CADET modifies the input file
+        # Run in place - output to separate file to avoid read-only mode issues
         run_file = input_file
-        output_file = input_file
 
-    # Build command
-    cmd = [str(cadet_cli_path), str(run_file)]
+    # Build command - ALWAYS pass both input and output to avoid read-only mode
+    # cadet-cli requires: cadet-cli <input> <output>
+    # Ensure output file doesn't exist (cadet-cli fails if it exists)
+    if output_file.exists():
+        output_file.unlink()
+
+    # Use absolute paths to avoid issues with cwd
+    cmd = [str(cadet_cli_path.resolve()), str(run_file.resolve()), str(output_file.resolve())]
 
     # Run simulation
     start_time = time.perf_counter()
@@ -135,7 +140,6 @@ def run_case(
             capture_output=True,
             text=True,
             timeout=timeout,
-            cwd=str(output_dir),
         )
         return_code = result.returncode
         stdout = result.stdout

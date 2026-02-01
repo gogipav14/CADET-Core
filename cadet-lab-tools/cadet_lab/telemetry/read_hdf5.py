@@ -22,6 +22,10 @@ class SolutionData:
         solver_stats: Dictionary of solver statistics if available (from versioned
             /output/solver_statistics/ group), or None.
         file_path: Path to the source HDF5 file.
+        bulk_profiles: Dictionary mapping unit IDs to bulk concentration arrays.
+        particle_profiles: Dictionary mapping (unit_id, partype) tuples to particle arrays.
+        solid_profiles: Dictionary mapping (unit_id, partype) tuples to solid phase arrays.
+        coordinates: Dictionary mapping coordinate names to coordinate arrays.
     """
 
     solution_times: np.ndarray
@@ -29,26 +33,32 @@ class SolutionData:
     inlet_profiles: Dict[str, np.ndarray] = field(default_factory=dict)
     solver_stats: Optional[Dict[str, any]] = None
     file_path: Optional[Path] = None
+    bulk_profiles: Dict[str, np.ndarray] = field(default_factory=dict)
+    particle_profiles: Dict[tuple, np.ndarray] = field(default_factory=dict)
+    solid_profiles: Dict[tuple, np.ndarray] = field(default_factory=dict)
+    coordinates: Dict[str, dict] = field(default_factory=dict)
 
 
 def read_solution(
     file_path: Union[str, Path],
     read_inlet: bool = False,
     read_bulk: bool = False,
+    read_full_state: bool = False,
 ) -> SolutionData:
     """Read solution data from a CADET HDF5 output file.
 
     Args:
         file_path: Path to the HDF5 output file.
         read_inlet: If True, also read inlet profiles.
-        read_bulk: If True, also read bulk phase data (not implemented yet).
+        read_bulk: If True, also read bulk phase data (deprecated, use read_full_state).
+        read_full_state: If True, read bulk, particle, solid, and coordinate data.
 
     Returns:
         SolutionData containing solution times, profiles, and statistics.
 
     Raises:
         FileNotFoundError: If the file does not exist.
-        ValueError: If the file is not a valid CADET output file.
+        ValueError: If the file is not a valid CADET output file or required datasets missing.
     """
     file_path = Path(file_path)
 
@@ -71,12 +81,36 @@ def read_solution(
             # Read solver statistics if available
             solver_stats = _read_solver_stats(f)
 
+            # Read full-state data if requested
+            bulk_profiles = {}
+            particle_profiles = {}
+            solid_profiles = {}
+            coordinates = {}
+
+            if read_full_state:
+                try:
+                    bulk_profiles = _read_bulk_profiles(f)
+                    particle_profiles = _read_particle_profiles(f)
+                    solid_profiles = _read_solid_profiles(f)
+                    coordinates = _read_coordinates(f)
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to read full-state data from {file_path}. "
+                        f"Ensure WRITE_SOLUTION_BULK=1, WRITE_SOLUTION_PARTICLE=1, "
+                        f"WRITE_SOLUTION_SOLID=1, and WRITE_COORDINATES=1 in return config. "
+                        f"Error: {e}"
+                    ) from e
+
             return SolutionData(
                 solution_times=solution_times,
                 outlet_profiles=outlet_profiles,
                 inlet_profiles=inlet_profiles,
                 solver_stats=solver_stats,
                 file_path=file_path,
+                bulk_profiles=bulk_profiles,
+                particle_profiles=particle_profiles,
+                solid_profiles=solid_profiles,
+                coordinates=coordinates,
             )
 
     except OSError as e:
@@ -172,6 +206,179 @@ def _read_inlet_profiles(f: h5py.File) -> Dict[str, np.ndarray]:
     return profiles
 
 
+def _read_bulk_profiles(f: h5py.File) -> Dict[str, np.ndarray]:
+    """Read bulk concentration profiles from all units.
+
+    Returns dictionary mapping unit IDs to bulk concentration arrays.
+
+    Raises:
+        ValueError: If SOLUTION_BULK dataset is expected but not found.
+    """
+    profiles = {}
+
+    if "output/solution" not in f:
+        return profiles
+
+    solution = f["output/solution"]
+
+    for key in solution.keys():
+        if key.startswith("unit_"):
+            unit_group = solution[key]
+
+            # Check if this unit type should have bulk data (not INLET/OUTLET)
+            unit_type = None
+            if f"input/model/{key}/UNIT_TYPE" in f:
+                unit_type_data = f[f"input/model/{key}/UNIT_TYPE"][()]
+                if isinstance(unit_type_data, bytes):
+                    unit_type = unit_type_data.decode()
+                else:
+                    unit_type = str(unit_type_data)
+
+            # Skip INLET and OUTLET units
+            if unit_type in ["INLET", "OUTLET"]:
+                continue
+
+            # For other unit types, expect SOLUTION_BULK if full-state output enabled
+            if "SOLUTION_BULK" in unit_group:
+                profiles[key] = np.array(unit_group["SOLUTION_BULK"])
+            elif unit_type:
+                # Full-state output was requested but dataset not found
+                raise ValueError(
+                    f"SOLUTION_BULK not found in {key} (type: {unit_type}). "
+                    f"Verify WRITE_SOLUTION_BULK=1 in return config."
+                )
+
+    return profiles
+
+
+def _read_particle_profiles(f: h5py.File) -> Dict[tuple, np.ndarray]:
+    """Read particle concentration profiles from all units.
+
+    Returns dictionary mapping (unit_id, partype) tuples to particle arrays.
+
+    Raises:
+        ValueError: If expected particle datasets are not found.
+    """
+    profiles = {}
+
+    if "output/solution" not in f:
+        return profiles
+
+    solution = f["output/solution"]
+
+    for key in solution.keys():
+        if key.startswith("unit_"):
+            unit_group = solution[key]
+
+            # Check if this unit has particle types
+            if f"input/model/{key}/NPARTYPE" in f:
+                n_partype = int(f[f"input/model/{key}/NPARTYPE"][()])
+
+                # Try different naming conventions
+                # CADET may write SOLUTION_PARTICLE or SOLUTION_PARTICLE_PARTYPE_XXX
+                if "SOLUTION_PARTICLE" in unit_group:
+                    # Single dataset for all particle types (common case)
+                    profiles[(key, 0)] = np.array(unit_group["SOLUTION_PARTICLE"])
+                else:
+                    # Separate datasets per particle type
+                    for partype in range(n_partype):
+                        dataset_name = f"SOLUTION_PARTICLE_PARTYPE_{partype:03d}"
+                        if dataset_name in unit_group:
+                            profiles[(key, partype)] = np.array(unit_group[dataset_name])
+                        else:
+                            raise ValueError(
+                                f"Neither SOLUTION_PARTICLE nor {dataset_name} found in {key}. "
+                                f"Verify WRITE_SOLUTION_PARTICLE=1 in return config."
+                            )
+
+    return profiles
+
+
+def _read_solid_profiles(f: h5py.File) -> Dict[tuple, np.ndarray]:
+    """Read solid phase concentration profiles from all units.
+
+    Returns dictionary mapping (unit_id, partype) tuples to solid phase arrays.
+
+    Raises:
+        ValueError: If expected solid datasets are not found.
+    """
+    profiles = {}
+
+    if "output/solution" not in f:
+        return profiles
+
+    solution = f["output/solution"]
+
+    for key in solution.keys():
+        if key.startswith("unit_"):
+            unit_group = solution[key]
+
+            # Check if this unit has particle types with bound states
+            if f"input/model/{key}/NPARTYPE" in f:
+                n_partype = int(f[f"input/model/{key}/NPARTYPE"][()])
+
+                # Try different naming conventions
+                # CADET may write SOLUTION_SOLID or SOLUTION_SOLID_PARTYPE_XXX
+                if "SOLUTION_SOLID" in unit_group:
+                    # Single dataset for all particle types (common case)
+                    profiles[(key, 0)] = np.array(unit_group["SOLUTION_SOLID"])
+                else:
+                    # Separate datasets per particle type
+                    for partype in range(n_partype):
+                        dataset_name = f"SOLUTION_SOLID_PARTYPE_{partype:03d}"
+                        if dataset_name in unit_group:
+                            profiles[(key, partype)] = np.array(unit_group[dataset_name])
+                        else:
+                            raise ValueError(
+                                f"Neither SOLUTION_SOLID nor {dataset_name} found in {key}. "
+                                f"Verify WRITE_SOLUTION_SOLID=1 in return config."
+                            )
+
+    return profiles
+
+
+def _read_coordinates(f: h5py.File) -> Dict[str, dict]:
+    """Read spatial coordinates from all units.
+
+    Returns dictionary mapping coordinate types to unit-specific coordinate arrays.
+    Format: {'axial': {'unit_001': array}, 'particle': {('unit_001', 0): array}}
+
+    Raises:
+        ValueError: If expected coordinate datasets are not found.
+    """
+    coordinates = {"axial": {}, "particle": {}}
+
+    if "output/solution" not in f:
+        return coordinates
+
+    solution = f["output/solution"]
+
+    for key in solution.keys():
+        if key.startswith("unit_"):
+            unit_group = solution[key]
+
+            # Read axial coordinates
+            if "AXIAL_COORDINATES" in unit_group:
+                coordinates["axial"][key] = np.array(unit_group["AXIAL_COORDINATES"])
+
+            # Read particle coordinates
+            # Try both PARTICLE_COORDINATES and PARTICLE_COORDINATES_XXX
+            if "PARTICLE_COORDINATES" in unit_group:
+                # Single dataset (common case with one particle type)
+                coordinates["particle"][(key, 0)] = np.array(unit_group["PARTICLE_COORDINATES"])
+            elif f"input/model/{key}/NPARTYPE" in f:
+                # Separate datasets per particle type
+                n_partype = int(f[f"input/model/{key}/NPARTYPE"][()])
+                for partype in range(n_partype):
+                    dataset_name = f"PARTICLE_COORDINATES_{partype:03d}"
+                    if dataset_name in unit_group:
+                        coordinates["particle"][(key, partype)] = np.array(
+                            unit_group[dataset_name]
+                        )
+
+    return coordinates
+
+
 def _read_solver_stats(f: h5py.File) -> Optional[Dict[str, any]]:
     """Read solver statistics if available.
 
@@ -209,6 +416,8 @@ def _read_solver_stats(f: h5py.File) -> Optional[Dict[str, any]]:
             "NUM_NONLIN_CONV_FAILS",  # New name from C++ implementation
             "NUM_NONLIN_ITERS",       # New field
             "NUM_CONV_FAILS",         # Legacy name (fallback)
+            "NUM_LIN_ITERS",          # Total linear solver iterations (Phase D prep)
+            "NUM_GMRES_RESTARTS",     # GMRES restarts if available (Phase D prep)
         ]
 
         for name in stat_names:

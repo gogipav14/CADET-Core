@@ -31,6 +31,7 @@ class StressSuiteResult:
         median_err_test_fails: Median error test failures across all runs.
         median_conv_fails: Median convergence failures across all runs.
         case_results: Dictionary mapping case names to individual results.
+        full_state_metrics: Optional dictionary of full-state metrics per case.
     """
 
     timestamp: str
@@ -42,6 +43,7 @@ class StressSuiteResult:
     median_err_test_fails: Optional[float]
     median_conv_fails: Optional[float]
     case_results: Dict[str, dict]
+    full_state_metrics: Optional[Dict[str, dict]] = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -94,6 +96,7 @@ def run_stress_suite(
     output_dir: Optional[Union[str, Path]] = None,
     cases: Optional[List[str]] = None,
     timeout: Optional[float] = 300.0,
+    full_state_mode: bool = False,
 ) -> StressSuiteResult:
     """Run all stress test cases and collect results.
 
@@ -102,6 +105,7 @@ def run_stress_suite(
         output_dir: Directory for output files. Uses temp directory if None.
         cases: List of case names to run. Runs all if None.
         timeout: Timeout in seconds for each case.
+        full_state_mode: Enable full-state output and metrics computation.
 
     Returns:
         StressSuiteResult containing summary and individual case results.
@@ -124,6 +128,7 @@ def run_stress_suite(
 
     # Run each case
     case_results: Dict[str, dict] = {}
+    full_state_metrics_dict: Dict[str, dict] = {} if full_state_mode else None
     wall_times: List[float] = []
     err_test_fails: List[int] = []
     conv_fails: List[int] = []
@@ -134,7 +139,11 @@ def run_stress_suite(
         # Generate input file
         input_file = output_dir / f"{case_name}_input.h5"
         try:
-            case_func(output_path=input_file, **default_kwargs)
+            # Add enable_full_state_output if in full_state_mode
+            kwargs = {**default_kwargs}
+            if full_state_mode:
+                kwargs["enable_full_state_output"] = True
+            case_func(output_path=input_file, **kwargs)
         except Exception as e:
             # Case generation failed
             case_results[case_name] = CaseResult(
@@ -180,6 +189,25 @@ def run_stress_suite(
         # Compute KPIs
         kpis = compute_kpis(result)
 
+        # Compute full-state metrics if enabled
+        if full_state_mode and result.success and result.output_file:
+            try:
+                from cadet_lab.telemetry.read_hdf5 import read_solution
+                # Use Path object for output_file (Path already imported at module level)
+                output_path = result.output_file if isinstance(result.output_file, Path) else Path(result.output_file)
+                solution_data = read_solution(output_path, read_full_state=True)
+                # Store basic full-state info (can add metrics later if reference available)
+                full_state_metrics_dict[case_name] = {
+                    "has_bulk": len(solution_data.bulk_profiles) > 0,
+                    "has_particle": len(solution_data.particle_profiles) > 0,
+                    "has_solid": len(solution_data.solid_profiles) > 0,
+                    "has_coordinates": len(solution_data.coordinates.get("axial", {})) > 0,
+                }
+            except Exception as e:
+                full_state_metrics_dict[case_name] = {
+                    "error": str(e),
+                }
+
         # Record result
         case_result = CaseResult(
             name=case_name,
@@ -224,6 +252,7 @@ def run_stress_suite(
         median_err_test_fails=median_err,
         median_conv_fails=median_conv,
         case_results=case_results,
+        full_state_metrics=full_state_metrics_dict,
     )
 
 

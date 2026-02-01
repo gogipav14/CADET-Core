@@ -29,6 +29,7 @@ def create_minimal_grm_config(
     binding_ka: float = 1.0,
     binding_kd: float = 1.0,
     inlet_concentration: float = 1.0,
+    enable_full_state_output: bool = False,
 ) -> Path:
     """Create a minimal CADET GRM configuration HDF5 file.
 
@@ -54,6 +55,7 @@ def create_minimal_grm_config(
         binding_ka: Adsorption rate constant.
         binding_kd: Desorption rate constant.
         inlet_concentration: Inlet concentration for step input.
+        enable_full_state_output: Enable bulk, particle, solid, and coordinate output.
 
     Returns:
         Path to created HDF5 file.
@@ -94,48 +96,59 @@ def create_minimal_grm_config(
         unit_001 = model.create_group("unit_001")
         _write_string(unit_001, "UNIT_TYPE", "GENERAL_RATE_MODEL")
         unit_001.create_dataset("NCOMP", data=n_comp)
+        unit_001.create_dataset("NPARTYPE", data=1)
 
-        # Geometry
+        # Geometry (column-level)
         unit_001.create_dataset("COL_LENGTH", data=col_length)
         unit_001.create_dataset("COL_POROSITY", data=col_porosity)
         unit_001.create_dataset("CROSS_SECTION_AREA", data=1e-4)  # m^2
-        unit_001.create_dataset("PAR_RADIUS", data=par_radius)
-        unit_001.create_dataset("PAR_POROSITY", data=par_porosity)
 
-        # Transport
+        # Transport (column-level)
         unit_001.create_dataset("COL_DISPERSION", data=col_dispersion)
         unit_001.create_dataset("VELOCITY", data=velocity)
-        unit_001.create_dataset("FILM_DIFFUSION", data=[film_diffusion] * n_comp)
-        unit_001.create_dataset("PORE_DIFFUSION", data=[pore_diffusion] * n_comp)
-        unit_001.create_dataset("SURFACE_DIFFUSION", data=[0.0] * n_comp)
 
-        # Initial conditions
+        # Initial conditions (column-level)
         unit_001.create_dataset("INIT_C", data=[0.0] * n_comp)
-        unit_001.create_dataset("INIT_CP", data=[0.0] * n_comp)
         unit_001.create_dataset("INIT_CS", data=[0.0] * n_comp)
 
-        # Particle type
-        unit_001.create_dataset("NPARTYPE", data=1)
-
-        # Adsorption
-        _write_string(unit_001, "ADSORPTION_MODEL", "LINEAR")
-        unit_001.create_dataset("NBOUND", data=[1] * n_comp)
-
-        ads = unit_001.create_group("adsorption")
-        ads.create_dataset("IS_KINETIC", data=1)
-        ads.create_dataset("LIN_KA", data=[binding_ka] * n_comp)
-        ads.create_dataset("LIN_KD", data=[binding_kd] * n_comp)
-
-        # Discretization
+        # Column discretization (CADET v6 format)
         disc = unit_001.create_group("discretization")
         _write_string(disc, "SPATIAL_METHOD", "DG")
         disc.create_dataset("NELEM", data=8)
         disc.create_dataset("POLYDEG", data=3)
-        disc.create_dataset("PAR_NELEM", data=1)
-        disc.create_dataset("PAR_POLYDEG", data=3)
-        _write_string(disc, "PAR_DISC_TYPE", "EQUIDISTANT")
+        disc.create_dataset("EXACT_INTEGRATION", data=1)
         disc.create_dataset("USE_ANALYTIC_JACOBIAN", data=1)
-        disc.create_dataset("RECONSTRUCTION", data="WENO")
+
+        # ===== Particle type 0 (CADET v6 format) =====
+        par_type_000 = unit_001.create_group("particle_type_000")
+        _write_string(par_type_000, "PAR_GEOM", "SPHERE")
+        par_type_000.create_dataset("PAR_POROSITY", data=par_porosity)
+        par_type_000.create_dataset("PAR_RADIUS", data=par_radius)
+        par_type_000.create_dataset("PAR_CORERADIUS", data=0.0)
+        par_type_000.create_dataset("NBOUND", data=[1] * n_comp)
+
+        # Transport in particle
+        par_type_000.create_dataset("FILM_DIFFUSION", data=[film_diffusion] * n_comp)
+        par_type_000.create_dataset("FILM_DIFFUSION_MULTIPLEX", data=0)
+        par_type_000.create_dataset("PORE_DIFFUSION", data=[pore_diffusion] * n_comp)
+        par_type_000.create_dataset("SURFACE_DIFFUSION", data=[0.0] * n_comp)
+        par_type_000.create_dataset("HAS_FILM_DIFFUSION", data=1)
+        par_type_000.create_dataset("HAS_PORE_DIFFUSION", data=1)
+        par_type_000.create_dataset("HAS_SURFACE_DIFFUSION", data=0)
+
+        # Adsorption (inside particle_type_000 for CADET v6)
+        _write_string(par_type_000, "ADSORPTION_MODEL", "LINEAR")
+        ads = par_type_000.create_group("adsorption")
+        ads.create_dataset("IS_KINETIC", data=1)
+        ads.create_dataset("LIN_KA", data=[binding_ka] * n_comp)
+        ads.create_dataset("LIN_KD", data=[binding_kd] * n_comp)
+
+        # Particle discretization (inside particle_type_000 for CADET v6)
+        par_disc = par_type_000.create_group("discretization")
+        _write_string(par_disc, "SPATIAL_METHOD", "DG")
+        _write_string(par_disc, "PAR_DISC_TYPE", "EQUIDISTANT")
+        par_disc.create_dataset("PAR_NELEM", data=1)
+        par_disc.create_dataset("PAR_POLYDEG", data=3)
 
         # ===== Unit 002: OUTLET =====
         unit_002 = model.create_group("unit_002")
@@ -182,17 +195,24 @@ def create_minimal_grm_config(
         # ===== Return settings =====
         ret.create_dataset("SPLIT_COMPONENTS_DATA", data=0)
         ret.create_dataset("SPLIT_PORTS_DATA", data=0)
+        ret.create_dataset("WRITE_SOLVER_STATISTICS", data=1)  # Enable solver stats
+
+        # Determine flags based on enable_full_state_output
+        bulk_flag = 1 if enable_full_state_output else 0
+        particle_flag = 1 if enable_full_state_output else 0
+        solid_flag = 1 if enable_full_state_output else 0
+        coordinates_flag = 1 if enable_full_state_output else 0
 
         for unit_name in ["unit_000", "unit_001", "unit_002"]:
             unit_ret = ret.create_group(unit_name)
             unit_ret.create_dataset("WRITE_SOLUTION_INLET", data=1)
             unit_ret.create_dataset("WRITE_SOLUTION_OUTLET", data=1)
-            unit_ret.create_dataset("WRITE_SOLUTION_BULK", data=0)
-            unit_ret.create_dataset("WRITE_SOLUTION_PARTICLE", data=0)
-            unit_ret.create_dataset("WRITE_SOLUTION_SOLID", data=0)
+            unit_ret.create_dataset("WRITE_SOLUTION_BULK", data=bulk_flag)
+            unit_ret.create_dataset("WRITE_SOLUTION_PARTICLE", data=particle_flag)
+            unit_ret.create_dataset("WRITE_SOLUTION_SOLID", data=solid_flag)
             unit_ret.create_dataset("WRITE_SOLUTION_FLUX", data=0)
             unit_ret.create_dataset("WRITE_SOLUTION_VOLUME", data=0)
-            unit_ret.create_dataset("WRITE_COORDINATES", data=0)
+            unit_ret.create_dataset("WRITE_COORDINATES", data=coordinates_flag)
             unit_ret.create_dataset("WRITE_SENS_OUTLET", data=0)
 
     return output_path
