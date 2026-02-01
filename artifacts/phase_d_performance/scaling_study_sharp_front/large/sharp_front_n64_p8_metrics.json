@@ -1,0 +1,26 @@
+{
+  "case_name": "sharp_front",
+  "spatial_resolution": {
+    "nelem_col": 64,
+    "nelem_par": 8,
+    "state_dimension_estimate": 2048
+  },
+  "tolerances": {
+    "abstol": 3e-09,
+    "reltol": 1e-05
+  },
+  "performance": {
+    "wall_time": 5.151523686000473,
+    "num_steps": 491,
+    "num_nonlin_iters": 982,
+    "num_err_test_fails": 2,
+    "num_conv_fails": 0
+  },
+  "derived_metrics": {
+    "wall_time_per_step": 0.010491901600815628,
+    "reject_ratio": 0.004073319755600814
+  },
+  "success": true,
+  "failure_reason": null,
+  "timestamp": "2026-01-31T22:52:03.337108"
+}
