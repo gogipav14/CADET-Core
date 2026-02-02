@@ -24,6 +24,8 @@
 
 #include "model/ModelSystemImpl-Helper.hpp"
 
+#include <iostream>
+
 namespace cadet
 {
 
@@ -33,6 +35,15 @@ namespace model
 int ModelSystem::linearSolve(double t, double alpha, double outerTol, double* const rhs, double const* const weight,
 	const ConstSimulationState& simState)
 {
+	// Phase D debug: Track ModelSystem linearSolve calls
+	static int modelSystemSolveCount = 0;
+	++modelSystemSolveCount;
+	if (modelSystemSolveCount <= 5)
+	{
+		std::cout << "[Phase D Debug] ModelSystem::linearSolve called (count=" << modelSystemSolveCount
+		          << ", numModels=" << _models.size() << ")" << std::endl;
+	}
+
 	if (_linearModelOrdering.sliceSize(_curSwitchIndex) == 0)
 	{
 		// Parallel
@@ -91,7 +102,19 @@ int ModelSystem::linearSolveSequential(double t, double alpha, double outerTol, 
 		}
 
 		// Solve unit operation itself
+		// Phase D debug: Track unit operation linearSolve calls
+		static int unitOpSolveCount = 0;
+		++unitOpSolveCount;
+		if (unitOpSolveCount <= 10)
+		{
+			std::cout << "[Phase D Debug] Calling unit operation " << idxUnit << " linearSolve (call count=" << unitOpSolveCount
+			          << ", unitOpName=" << m->unitOperationName() << ")" << std::endl;
+		}
 		_errorIndicator[idxUnit] = m->linearSolve(t, alpha, outerTol, rhs + offset, weight + offset, applyOffset(simState, offset));
+		if (unitOpSolveCount <= 10)
+		{
+			std::cout << "[Phase D Debug] Unit operation " << idxUnit << " linearSolve returned errorIndicator=" << _errorIndicator[idxUnit] << std::endl;
+		}
 	}
 
 	return totalErrorIndicatorFromLocal(_errorIndicator);

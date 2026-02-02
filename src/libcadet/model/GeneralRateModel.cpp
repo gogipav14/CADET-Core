@@ -970,6 +970,28 @@ void GeneralRateModel<ConvDispOperator>::useAnalyticJacobian(const bool analytic
 }
 
 template <typename ConvDispOperator>
+LinearSolverStats GeneralRateModel<ConvDispOperator>::getLinearSolverStats() const CADET_NOEXCEPT
+{
+	LinearSolverStats stats;
+	stats.numLinearIterations = _gmres.numIterations();
+	// Note: GMRES restarts and solve count tracking would require additional instrumentation
+	stats.numLinearSolves = 0;  // Not currently tracked
+	stats.numGmresRestarts = 0; // Not currently tracked
+	stats.linearSolveTime = 0.0; // Not currently tracked
+
+	// Phase D debug: Log what we're returning
+	static bool logged = false;
+	if (!logged)
+	{
+		LOG(Debug) << "[Phase D Debug] GeneralRateModel::getLinearSolverStats() returning "
+		           << "numLinearIterations=" << stats.numLinearIterations;
+		logged = true;  // Only log once to avoid spam
+	}
+
+	return stats;
+}
+
+template <typename ConvDispOperator>
 void GeneralRateModel<ConvDispOperator>::notifyDiscontinuousSectionTransition(double t, unsigned int secIdx, const ConstSimulationState& simState, const AdJacobianParams& adJac)
 {
 	// Setup flux Jacobian blocks at the beginning of the simulation or in case of

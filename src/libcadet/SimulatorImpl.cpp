@@ -27,6 +27,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cstdlib>
+#include <iostream>
 
 #include "AutoDiff.hpp"
 #include "LoggingUtils.hpp"
@@ -320,6 +321,14 @@ namespace cadet
 	*/
 	int linearSolveWrapper(IDAMem IDA_mem, N_Vector rhs, N_Vector weight, N_Vector y, N_Vector yDot, N_Vector res)
 	{
+		// Phase D debug: Track if this wrapper is ever called
+		static int wrapperCallCount = 0;
+		++wrapperCallCount;
+		if (wrapperCallCount <= 5)
+		{
+			std::cout << "[Phase D Debug] linearSolveWrapper called (count=" << wrapperCallCount << ")" << std::endl;
+		}
+
 		cadet::Simulator* const sim = static_cast<cadet::Simulator*>(IDA_mem->ida_lmem);
 		const double t = IDA_mem->ida_tn;
 		const double alpha = IDA_mem->ida_cj;
@@ -1409,12 +1418,20 @@ namespace cadet
 		IDAGetNumNonlinSolvIters(_idaMemBlock, &_solverStats.numNonlinSolvIters);
 		IDAGetNumNonlinSolvConvFails(_idaMemBlock, &_solverStats.numNonlinSolvConvFails);
 
-		// Linear solver statistics (Phase D instrumentation)
-		// Note: SUNDIALS IDA API doesn't expose IDAGetNumLinIters in version 3.2.1
-		// Linear iteration counts remain 0 unless CADET_BENCHMARK_MODE is enabled
-		// Future work: implement linear iteration tracking via GMRES callback
+		// Aggregate linear solver statistics from all unit operation models (Phase D instrumentation)
 		_solverStats.numLinIters = 0;
 		_solverStats.numGmresRestarts = 0;
+
+		for (unsigned int i = 0; i < _model->numModels(); ++i)
+		{
+			IModel* model = _model->getModel(i);
+			if (model)
+			{
+				LinearSolverStats modelStats = model->getLinearSolverStats();
+				_solverStats.numLinIters += modelStats.numLinearIterations;
+				_solverStats.numGmresRestarts += modelStats.numGmresRestarts;
+			}
+		}
 
 		LOG(Debug) << "Solver statistics: Steps=" << _solverStats.numSteps
 			<< " RhsEvals=" << _solverStats.numRhsEvals

@@ -93,6 +93,8 @@ namespace cadet
 
 			virtual void useAnalyticJacobian(const bool analyticJac);
 
+			virtual LinearSolverStats getLinearSolverStats() const CADET_NOEXCEPT;
+
 			virtual void reportSolution(ISolutionRecorder& recorder, double const* const solution) const;
 			virtual void reportSolutionStructure(ISolutionRecorder& recorder) const;
 

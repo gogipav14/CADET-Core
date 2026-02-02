@@ -493,6 +493,12 @@ void MultiChannelTransportModel::useAnalyticJacobian(const bool analyticJac)
 #endif
 }
 
+LinearSolverStats MultiChannelTransportModel::getLinearSolverStats() const CADET_NOEXCEPT
+{
+	// Multi-channel transport model has no linear solver
+	return LinearSolverStats();
+}
+
 void MultiChannelTransportModel::notifyDiscontinuousSectionTransition(double t, unsigned int secIdx, const ConstSimulationState& simState, const AdJacobianParams& adJac)
 {
 	Indexer idxr(_disc);

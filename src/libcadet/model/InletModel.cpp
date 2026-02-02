@@ -260,6 +260,13 @@ template<> active const* InletModel::getData() const
 }
 
 void InletModel::useAnalyticJacobian(const bool analyticJac) { }
+
+LinearSolverStats InletModel::getLinearSolverStats() const CADET_NOEXCEPT
+{
+	// Inlet model has no linear solver
+	return LinearSolverStats();
+}
+
 void InletModel::notifyDiscontinuousSectionTransition(double t, unsigned int secIdx, const ConstSimulationState& simState, const AdJacobianParams& adJac) { }
 
 void InletModel::reportSolution(ISolutionRecorder& recorder, double const* const solution) const

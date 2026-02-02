@@ -424,6 +424,13 @@ void LumpedRateModelWithoutPores<ConvDispOperator>::useAnalyticJacobian(const bo
 }
 
 template <typename ConvDispOperator>
+LinearSolverStats LumpedRateModelWithoutPores<ConvDispOperator>::getLinearSolverStats() const CADET_NOEXCEPT
+{
+	// Model without pores has no linear solver (no Schur complement)
+	return LinearSolverStats();
+}
+
+template <typename ConvDispOperator>
 void LumpedRateModelWithoutPores<ConvDispOperator>::notifyDiscontinuousSectionTransition(double t, unsigned int secIdx, const ConstSimulationState& simState, const AdJacobianParams& adJac)
 {
 	Indexer idxr(_disc);

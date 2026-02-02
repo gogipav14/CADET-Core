@@ -563,6 +563,12 @@ void ColumnModel1D::useAnalyticJacobian(const bool analyticJac)
 #endif
 }
 
+LinearSolverStats ColumnModel1D::getLinearSolverStats() const CADET_NOEXCEPT
+{
+	// Column model 1D has no linear solver
+	return LinearSolverStats();
+}
+
 void ColumnModel1D::notifyDiscontinuousSectionTransition(double t, unsigned int secIdx, const ConstSimulationState& simState, const AdJacobianParams& adJac)
 {
 	Indexer idxr(_disc);

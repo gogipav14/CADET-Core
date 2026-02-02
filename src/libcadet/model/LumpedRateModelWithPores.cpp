@@ -661,6 +661,17 @@ void LumpedRateModelWithPores<ConvDispOperator>::useAnalyticJacobian(const bool 
 }
 
 template <typename ConvDispOperator>
+LinearSolverStats LumpedRateModelWithPores<ConvDispOperator>::getLinearSolverStats() const CADET_NOEXCEPT
+{
+	LinearSolverStats stats;
+	stats.numLinearIterations = _gmres.numIterations();
+	stats.numLinearSolves = 0;      // Not currently tracked
+	stats.numGmresRestarts = 0;     // Not currently tracked
+	stats.linearSolveTime = 0.0;    // Not currently tracked
+	return stats;
+}
+
+template <typename ConvDispOperator>
 void LumpedRateModelWithPores<ConvDispOperator>::notifyDiscontinuousSectionTransition(double t, unsigned int secIdx, const ConstSimulationState& simState, const AdJacobianParams& adJac)
 {
 	// Setup flux Jacobian blocks at the beginning of the simulation or in case of

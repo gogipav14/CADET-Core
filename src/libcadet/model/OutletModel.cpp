@@ -126,6 +126,13 @@ unsigned int OutletModel::numSensParams() const
 }
 
 void OutletModel::useAnalyticJacobian(const bool analyticJac) { }
+
+LinearSolverStats OutletModel::getLinearSolverStats() const CADET_NOEXCEPT
+{
+	// Outlet model has no linear solver
+	return LinearSolverStats();
+}
+
 void OutletModel::notifyDiscontinuousSectionTransition(double t, unsigned int secIdx, const ConstSimulationState& simState, const AdJacobianParams& adJac) { }
 
 void OutletModel::reportSolution(ISolutionRecorder& recorder, double const* const solution) const

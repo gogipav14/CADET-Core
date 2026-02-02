@@ -406,6 +406,12 @@ namespace cadet
 #endif
 		}
 
+	LinearSolverStats LumpedRateModelWithoutPoresDG::getLinearSolverStats() const CADET_NOEXCEPT
+	{
+		// Lumped rate model DG without pores has no linear solver
+		return LinearSolverStats();
+	}
+
 		void LumpedRateModelWithoutPoresDG::notifyDiscontinuousSectionTransition(double t, unsigned int secIdx, const ConstSimulationState& simState, const AdJacobianParams& adJac)
 		{
 			// TODO: reset pattern every time section?

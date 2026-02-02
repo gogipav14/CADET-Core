@@ -22,6 +22,7 @@
 #include "SundialsVector.hpp"
 
 #include <type_traits>
+#include <iostream>
 
 namespace cadet
 {
@@ -36,6 +37,15 @@ int gmresCallback(void* userData, N_Vector v, N_Vector z)
 
 	// Track iterations for performance instrumentation (Phase D)
 	++g->_numIter;
+
+	// Phase D debug: Log first few callbacks to confirm GMRES is iterating
+	static int callbackCount = 0;
+	++callbackCount;
+	if (callbackCount <= 10)
+	{
+		std::cout << "[Phase D Debug] gmresCallback invoked (callback #" << callbackCount
+		          << ", cumulative GMRES iters=" << g->_numIter << ")" << std::endl;
+	}
 
 	Gmres::MatrixVectorMultFun callback = g->matrixVectorMultiplier();
 	return callback(g->userData(), NVEC_DATA(v), NVEC_DATA(z));
@@ -95,6 +105,17 @@ void Gmres::initialize(unsigned int matrixSize, unsigned int maxKrylov, Orthogon
 
 int Gmres::solve(double tolerance, double const* weight, double const* rhs, double* sol)
 {
+	// Phase D debug: Track GMRES solve invocations
+	static int gmresSolveCallCount = 0;
+	++gmresSolveCallCount;
+	const int itersBefore = _numIter;
+	if (gmresSolveCallCount <= 5 || gmresSolveCallCount % 100 == 0)
+	{
+		std::cout << "[Phase D Debug] Gmres::solve entered (call count=" << gmresSolveCallCount
+		          << ", matrixSize=" << _matrixSize << ", tolerance=" << tolerance
+		          << ", maxRestarts=" << _maxRestarts << ", cumulative iters=" << _numIter << ")" << std::endl;
+	}
+
 	// Create init-guess/solution vector by bending pointer
 	N_Vector NV_sol = NVec_NewEmpty(_matrixSize);
 	NVEC_DATA(NV_sol) = sol;
@@ -134,6 +155,16 @@ int Gmres::solve(double tolerance, double const* weight, double const* rhs, doub
 	NVec_Destroy(NV_rhs);
 	NVec_Destroy(NV_weight);
 	NVec_Destroy(NV_sol);
+
+	// Phase D debug: Report GMRES solve result
+	const int itersAfter = _numIter;
+	const int itersDelta = itersAfter - itersBefore;
+	if (gmresSolveCallCount <= 5 || gmresSolveCallCount % 100 == 0)
+	{
+		std::cout << "[Phase D Debug] Gmres::solve completed (flag=" << flag
+		          << ", iterations this solve=" << itersDelta
+		          << ", cumulative total=" << itersAfter << ")" << std::endl;
+	}
 
 	return flag;
 }

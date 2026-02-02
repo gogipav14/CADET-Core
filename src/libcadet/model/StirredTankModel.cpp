@@ -486,6 +486,12 @@ void CSTRModel::useAnalyticJacobian(const bool analyticJac)
 #endif
 }
 
+LinearSolverStats CSTRModel::getLinearSolverStats() const CADET_NOEXCEPT
+{
+	// CSTR model has no linear solver
+	return LinearSolverStats();
+}
+
 void CSTRModel::notifyDiscontinuousSectionTransition(double t, unsigned int secIdx, const ConstSimulationState& simState, const AdJacobianParams& adJac)
 {
 	if (_flowRateFilter.size() > 1)

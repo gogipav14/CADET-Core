@@ -31,6 +31,23 @@ namespace cadet
 {
 
 /**
+ * @brief Holds linear solver statistics from a model
+ * @details Accumulated statistics from iterative linear solvers (GMRES, etc.)
+ *          used within a unit operation model for solving linear systems.
+ */
+struct CADET_API LinearSolverStats
+{
+	long numLinearSolves;      //!< Total number of linear solver invocations
+	long numLinearIterations;  //!< Total number of linear solver iterations (e.g., GMRES iterations)
+	long numGmresRestarts;     //!< Total number of GMRES restarts
+	double linearSolveTime;    //!< Total wall time spent in linear solver (seconds)
+
+	LinearSolverStats() CADET_NOEXCEPT
+		: numLinearSolves(0), numLinearIterations(0), numGmresRestarts(0), linearSolveTime(0.0)
+	{ }
+};
+
+/**
  * @brief Interface common to all unit operation models
  * @details Users of the library are not supposed to implement this interface! The simulator provided
  *          by this library is not capable of simulating models defined by custom user code.
@@ -93,10 +110,19 @@ public:
 
 	/**
 	 * @brief Determines whether analytical Jacobians are used instead of AD Jacobians
-	 * 
+	 *
 	 * @param [in] analyticJac @c true if analytic Jacobians should be used (recommended), @c false for AD Jacobians
 	 */
 	virtual void useAnalyticJacobian(const bool analyticJac) = 0;
+
+	/**
+	 * @brief Returns linear solver statistics from this model
+	 * @details Returns accumulated statistics from iterative linear solvers used within
+	 *          this unit operation model. Models that use direct factorization or no
+	 *          linear solver return zeros.
+	 * @return Linear solver statistics
+	 */
+	virtual LinearSolverStats getLinearSolverStats() const CADET_NOEXCEPT = 0;
 
 #ifdef CADET_BENCHMARK_MODE
 	/**

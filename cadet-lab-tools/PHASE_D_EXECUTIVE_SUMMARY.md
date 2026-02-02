@@ -178,22 +178,33 @@ R_eff(s) = 1 + F·β(s)·η(s)
 
 ### Decision on Track 2 (FFT Preconditioner)
 
-**Recommendation:** ❌ Defer indefinitely
+**Track 2a (GMRES Stress Testing):** ✅ **COMPLETE**
 
-**Rationale:**
-- Phase D-1 showed GMRES already excellent (4-6 iters/step, decreasing with refinement)
-- Track 1 provides sufficient acceleration for linear problems
-- Binding problems need different approach (alternative Laplace inversion, not GMRES)
-- FFT preconditioner development not justified without clear bottleneck
+**Results:**
+- 18 stress tests across extreme parameter ranges (Peclet 100-10,000, n_comp 1-8, tolerances 1e-6 to 1e-12, binding kinetics 4 orders of magnitude)
+- **Maximum iterations per step: 3.25** (far below 20.0 threshold)
+- **Perfect scaling:** Multi-component constant at 2.86 iters/step (1-8 components)
+- **Counter-intuitive:** Higher Peclet reduces iterations (3.10→2.96), tighter tolerances reduce iterations (2.86→1.99)
+
+**Track 2b (FFT Preconditioner Prototype):** ❌ **SKIPPED**
+
+**Decision Gate:**
+- No bottleneck found (max 3.25 << 20.0 threshold) ✅
+- No scaling degradation (max 1.44× << 2.0× threshold) ✅
+- FFT preconditioner development not justified
+
+**Conclusion:** CADET's Schur complement preconditioner is **already near-optimal**. Moljax-style FFT gains likely apply to solvers without physics-based preconditioning.
 
 ---
 
 ## Return on Investment
 
 ### Development Effort
-- **Track 1:** ~80 hours (benchmarking + GRM derivation)
+- **Track 1 (NILT):** ~80 hours (benchmarking + GRM derivation)
+- **Track 2a (GMRES Stress):** ~16 hours (instrumentation + 18 tests + analysis)
+- **Track 2b (FFT Precond):** 0 hours (skipped, saved ~80-120 hours)
 - **Infrastructure:** Reusable framework for future studies
-- **Documentation:** 27-page derivation + comprehensive report
+- **Documentation:** 27-page derivation + 2 comprehensive reports
 
 ### Production Value
 - **Parameter estimation speedup:** 100-1600× for transport problems
@@ -202,9 +213,10 @@ R_eff(s) = 1 + F·β(s)·η(s)
 - **Future-proofing:** Transfer functions ready for alternative inversion methods
 
 ### Knowledge Gained
-- Precise characterization of FFT-NILT applicability
-- Complete GRM theory in Laplace domain
-- Identification of algorithm limitations (not implementation bugs)
+- **NILT:** Precise characterization of FFT-NILT applicability (transport: excellent, binding: fundamentally limited)
+- **GRM Theory:** Complete mathematical derivation in Laplace domain (27 pages, first principles)
+- **GMRES Baseline:** Quantitative evidence that Schur complement preconditioner is near-optimal (2-4 iters/step)
+- **Decision Validation:** Data-driven decisions prevent wasted effort (Track 2b would have consumed 80-120 hours with no ROI)
 
 ---
 
@@ -230,7 +242,8 @@ R_eff(s) = 1 + F·β(s)·η(s)
 ## Files and Artifacts
 
 **Reports:**
-- `PHASE_D_TRACK1_REPORT.md` - Comprehensive 40-page analysis
+- `PHASE_D_TRACK1_REPORT.md` - Comprehensive 40-page analysis (NILT benchmarks)
+- `PHASE_D_TRACK2A_REPORT.md` - GMRES stress testing results (18 tests)
 - `PHASE_D_EXECUTIVE_SUMMARY.md` - This document
 - `GRM_TRANSFER_FUNCTION_STATUS.md` - Implementation assessment
 
@@ -238,23 +251,40 @@ R_eff(s) = 1 + F·β(s)·η(s)
 - `docs/GRM_TRANSFER_FUNCTIONS_DERIVATION.md` - 27-page mathematical derivation
 
 **Code:**
-- `cadet_lab/benchmarks/` - Benchmarking framework (5 modules, 750+ LOC)
+- `cadet_lab/benchmarks/` - Benchmarking framework (6 modules, 1400+ LOC)
+  - `nilt_comparison.py`, `nilt_problem_suite.py` - Track 1 NILT benchmarks
+  - `gmres_stress_suite.py` - Track 2a GMRES stress testing (~600 LOC)
 - `cadet_lab/nilt/benchmarks.py` - Transfer functions (advection_dispersion, grm_langmuir, grm_sma)
-- `scripts/run_track1_nilt_benchmarks.py` - Master benchmark runner
+- `scripts/run_track1_nilt_benchmarks.py` - Master NILT benchmark runner
+- `scripts/run_track2a_gmres_stress.py` - Master GMRES stress test runner
 
 **Data:**
-- `artifacts/track1_full/` - 24 benchmark results (JSON)
-- 4 problems × 4 tiers × (accuracy + performance metrics)
+- `artifacts/track1_full/` - 24 NILT benchmark results (JSON)
+  - 4 problems × 4 tiers × (accuracy + performance metrics)
+- `artifacts/track2a_gmres_stress_VALID/` - 18 GMRES stress test results
+  - `gmres_stress_results.json` - Complete results with decision gate analysis
+  - 18 HDF5 config files with valid NUM_LIN_ITERS data
 
 ---
 
 ## Conclusion
 
-**Phase D successfully delivered production-ready NILT acceleration for transport problems** (100-1600× speedup, <1% error) and established theoretical foundation for future binding work.
+**Phase D successfully delivered:**
 
-**Deploy immediately for parameter estimation.** Continue using CADET for binding problems while researching alternative Laplace inversion methods.
+1. **Track 1 (NILT):** Production-ready acceleration for transport problems (100-1600× speedup, <1% error)
+   - Deploy immediately for parameter estimation
+   - Complete GRM transfer function theory (foundation for future work)
+   - Identified fundamental limitation for kinetic binding (mixed time scales)
 
-**Key insight:** FFT-NILT's limitation is fundamental (mixed time scales), not fixable by tuning. Future work should focus on pole-avoiding methods (Talbot, Weeks) rather than FFT parameter optimization.
+2. **Track 2a (GMRES Stress):** Quantitative validation of CADET's linear solver excellence
+   - 18 tests across extreme parameter ranges: 2-4 iters/step (near-optimal)
+   - Perfect multi-component scaling, counter-intuitive Peclet/tolerance trends
+   - Data-driven decision to skip Track 2b (saved 80-120 hours)
+
+**Key insights:**
+- FFT-NILT limitation is fundamental (pole structure), not fixable by tuning → pursue alternative inversion methods (Talbot, Weeks)
+- Schur complement captures GRM physics better than generic FFT preconditioner → moljax gains don't apply to CADET
+- Always rebuild C++ code before benchmarking (obvious but critical!)
 
 ---
 

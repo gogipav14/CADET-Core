@@ -1076,6 +1076,16 @@ void GeneralRateModel2D::useAnalyticJacobian(const bool analyticJac)
 #endif
 }
 
+LinearSolverStats GeneralRateModel2D::getLinearSolverStats() const CADET_NOEXCEPT
+{
+	LinearSolverStats stats;
+	stats.numLinearIterations = _gmres.numIterations();
+	stats.numLinearSolves = 0;      // Not currently tracked
+	stats.numGmresRestarts = 0;     // Not currently tracked
+	stats.linearSolveTime = 0.0;    // Not currently tracked
+	return stats;
+}
+
 void GeneralRateModel2D::notifyDiscontinuousSectionTransition(double t, unsigned int secIdx, const ConstSimulationState& simState, const AdJacobianParams& adJac)
 {
 	// Setup flux Jacobian blocks at the beginning of the simulation or in case of
