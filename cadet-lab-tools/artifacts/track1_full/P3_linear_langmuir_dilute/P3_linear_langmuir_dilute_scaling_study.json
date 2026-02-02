@@ -1,0 +1,86 @@
+{
+  "problem_id": "P3_linear_langmuir_dilute",
+  "results": [
+    {
+      "problem_id": "P3_linear_langmuir_dilute",
+      "tier_name": "small",
+      "ncol": 16,
+      "npar": 2,
+      "dofs": 128,
+      "rmse": 6.820133359490147e-08,
+      "l2_norm": 9.645125094184146e-07,
+      "linf_norm": 1.7733583664303992e-07,
+      "relative_l2_error": 1223638.5290425555,
+      "nilt_time": 0.00021028518676757812,
+      "cadet_time": 0.04178571701049805,
+      "speedup": 198.70975056689343,
+      "eps_im": 8.463905425413728e-17,
+      "nilt_success": true,
+      "cadet_steps": 142,
+      "cadet_success": true
+    },
+    {
+      "problem_id": "P3_linear_langmuir_dilute",
+      "tier_name": "medium",
+      "ncol": 32,
+      "npar": 4,
+      "dofs": 512,
+      "rmse": 1.4332382777637595e-07,
+      "l2_norm": 2.026905010525766e-06,
+      "linf_norm": 3.067919917258475e-07,
+      "relative_l2_error": 2571453.4973571813,
+      "nilt_time": 0.00021910667419433594,
+      "cadet_time": 0.6166903972625732,
+      "speedup": 2814.5669205658323,
+      "eps_im": 8.463905425413728e-17,
+      "nilt_success": true,
+      "cadet_steps": 2177,
+      "cadet_success": true
+    },
+    {
+      "problem_id": "P3_linear_langmuir_dilute",
+      "tier_name": "large",
+      "ncol": 64,
+      "npar": 8,
+      "dofs": 2048,
+      "rmse": 7.861045604663555e-13,
+      "l2_norm": 1.111719730854861e-11,
+      "linf_norm": 1.979067391654612e-12,
+      "relative_l2_error": 14.103944561497627,
+      "nilt_time": 0.000244140625,
+      "cadet_time": 0.04107856750488281,
+      "speedup": 168.2578125,
+      "eps_im": 8.463905425413728e-17,
+      "nilt_success": true,
+      "cadet_steps": 28,
+      "cadet_success": true
+    },
+    {
+      "problem_id": "P3_linear_langmuir_dilute",
+      "tier_name": "xlarge",
+      "ncol": 128,
+      "npar": 16,
+      "dofs": 8192,
+      "rmse": 8.032320136348678e-08,
+      "l2_norm": 1.135941607414681e-06,
+      "linf_norm": 2.2581503289702877e-07,
+      "relative_l2_error": 1441123.7842972847,
+      "nilt_time": 0.0002536773681640625,
+      "cadet_time": 187.60727262496948,
+      "speedup": 739550.6898496241,
+      "eps_im": 8.463905425413728e-17,
+      "nilt_success": true,
+      "cadet_steps": 21175,
+      "cadet_success": true
+    }
+  ],
+  "timestamp": "2026-02-01T19:09:42.731057",
+  "metadata": {
+    "nilt_params": {
+      "alpha": 0.5,
+      "N": 256,
+      "t_final": 100.0
+    },
+    "n_tiers": 4
+  }
+}

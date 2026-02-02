@@ -107,6 +107,226 @@ def langmuir_column_transfer(
     return F
 
 
+def grm_langmuir_transfer(
+    velocity: float = 1e-3,
+    dispersion: float = 1e-6,
+    length: float = 0.1,
+    col_porosity: float = 0.37,
+    par_radius: float = 1e-5,
+    par_porosity: float = 0.33,
+    film_diffusion: float = 1e-5,
+    pore_diffusion: float = 1e-10,
+    ka: float = 1.0,
+    kd: float = 0.1,
+    qmax: float = 10.0,
+) -> Callable[[complex], complex]:
+    """Full GRM transfer function with kinetic Langmuir binding.
+
+    Includes particle dynamics (film + pore diffusion) and kinetic binding.
+    Derived from first principles via Laplace transform of GRM equations.
+
+    This transfer function accounts for:
+    - Column advection-dispersion
+    - Film mass transfer resistance (particle surface)
+    - Pore diffusion within particles
+    - Kinetic Langmuir binding (with rate constants ka, kd)
+
+    Valid for:
+    - Single component
+    - Dilute regime (c << qmax, linear binding)
+    - Isothermal conditions
+
+    Mathematical derivation in docs/GRM_TRANSFER_FUNCTIONS_DERIVATION.md
+
+    Args:
+        velocity: Interstitial velocity [m/s].
+        dispersion: Axial dispersion coefficient [m²/s].
+        length: Column length [m].
+        col_porosity: Column (interstitial) porosity [-].
+        par_radius: Particle radius [m].
+        par_porosity: Particle porosity [-].
+        film_diffusion: Film mass transfer coefficient [m/s].
+        pore_diffusion: Pore diffusion coefficient [m²/s].
+        ka: Adsorption rate constant [1/s] (for dilute: dq/dt = ka*qmax*c - kd*q).
+        kd: Desorption rate constant [1/s].
+        qmax: Maximum binding capacity [mol/m³].
+
+    Returns:
+        Callable F(s) for the transfer function.
+
+    Example:
+        >>> F = grm_langmuir_transfer(
+        ...     velocity=1e-3, dispersion=1e-6, length=0.1,
+        ...     col_porosity=0.37, par_radius=1e-5, par_porosity=0.33,
+        ...     film_diffusion=1e-5, pore_diffusion=1e-10,
+        ...     ka=1.0, kd=0.1, qmax=100.0
+        ... )
+        >>> outlet_conc = F(s=0.1)  # Evaluate at s=0.1
+    """
+    # Dimensionless parameters
+    Pe = velocity * length / dispersion  # Peclet number
+    tau = length / velocity  # Residence time
+    Bi = film_diffusion * par_radius / pore_diffusion  # Biot number
+    phase_ratio = (1.0 - col_porosity) / col_porosity  # Solid/liquid volume ratio
+
+    def F(s: complex) -> complex:
+        # Effective binding capacity (frequency-dependent)
+        # β(s) = ε_p + (1-ε_p) · ka·qmax/(s+kd)
+        beta = par_porosity + (1.0 - par_porosity) * ka * qmax / (s + kd)
+
+        # Particle diffusion parameter: ξ = r_p · √(s·β/D_p)
+        xi_sq = par_radius**2 * s * beta / pore_diffusion
+        xi = cmath.sqrt(xi_sq)
+
+        # Particle response function η(s) using hyperbolic functions
+        # η = 3/ξ² · [sinh(ξ) - ξ·cosh(ξ)] / [sinh(ξ) + Bi·(sinh(ξ) - ξ·cosh(ξ))/ξ]
+
+        # Handle small ξ (Taylor expansion to avoid numerical issues)
+        if abs(xi) < 1e-6:
+            # Limit as ξ→0: sinh(ξ)→ξ, cosh(ξ)→1, sinh(ξ)-ξ·cosh(ξ) → -ξ³/3
+            # η → 3/ξ² · (-ξ³/3) / (-ξ³/3·Bi/ξ) = 1/(1 + Bi/5) (from full expansion)
+            eta = 1.0 / (1.0 + Bi / 5.0)
+        else:
+            sinh_xi = cmath.sinh(xi)
+            cosh_xi = cmath.cosh(xi)
+
+            numerator = sinh_xi - xi * cosh_xi
+            denominator = sinh_xi + Bi * numerator / xi
+
+            # Avoid division by very small denominator
+            if abs(denominator) < 1e-15:
+                eta = 0.0
+            else:
+                eta = 3.0 * numerator / (xi_sq * denominator)
+
+        # Effective retardation factor: R_eff(s) = 1 + F·β(s)·η(s)
+        R_eff = 1.0 + phase_ratio * beta * eta
+
+        # Column transfer function with effective retardation
+        # F(s) = exp(Pe/2 · (1 - √[1 + 4·s·τ²·R_eff/Pe]))
+        inner = 1.0 + 4.0 * s * tau**2 * R_eff / Pe
+        sqrt_inner = cmath.sqrt(inner)
+
+        return cmath.exp(Pe / 2.0 * (1.0 - sqrt_inner))
+
+    return F
+
+
+def grm_sma_transfer(
+    velocity: float = 1e-3,
+    dispersion: float = 1e-6,
+    length: float = 0.1,
+    col_porosity: float = 0.37,
+    par_radius: float = 1e-5,
+    par_porosity: float = 0.33,
+    film_diffusion: float = 1e-5,
+    pore_diffusion: float = 1e-10,
+    ka: float = 1.0,
+    kd: float = 0.1,
+    Lambda: float = 10.0,
+    nu: float = 4.5,
+    z_protein: float = 5.0,
+    z_salt: float = 1.0,
+    c0: float = 1e-6,
+    c_salt: float = 0.1,
+) -> Callable[[complex], complex]:
+    """GRM transfer function with linearized SMA (Steric Mass Action) binding.
+
+    Linearizes SMA around base state (c₀, q₀) for small perturbations.
+    Uses effective rate constants k_a_eff, k_d_eff and treats as Langmuir.
+
+    SMA binding kinetics:
+        ∂q/∂t = ka · c · (Λ - z_protein·q - z_salt·c_salt)^nu - kd · q
+
+    Linearization around base state gives:
+        ∂(δq)/∂t = k_a_eff · δc - k_d_eff · δq
+
+    Valid for:
+    - Small concentration perturbations around base state
+    - Single protein component + salt
+    - Dilute to moderate loading
+
+    Mathematical derivation in docs/GRM_TRANSFER_FUNCTIONS_DERIVATION.md
+
+    Args:
+        velocity: Interstitial velocity [m/s].
+        dispersion: Axial dispersion coefficient [m²/s].
+        length: Column length [m].
+        col_porosity: Column porosity [-].
+        par_radius: Particle radius [m].
+        par_porosity: Particle porosity [-].
+        film_diffusion: Film mass transfer coefficient [m/s].
+        pore_diffusion: Pore diffusion coefficient [m²/s].
+        ka: SMA adsorption constant [m³/(mol·s)].
+        kd: SMA desorption rate constant [1/s].
+        Lambda: Steric capacity [mol/m³].
+        nu: Characteristic charge [-].
+        z_protein: Protein charge [-].
+        z_salt: Salt valence [-].
+        c0: Base protein concentration for linearization [mol/m³].
+        c_salt: Salt concentration [mol/m³].
+
+    Returns:
+        Callable F(s) for the transfer function.
+
+    Example:
+        >>> # IgG on Protein A resin (typical values)
+        >>> F = grm_sma_transfer(
+        ...     velocity=1e-4, dispersion=1e-7, length=0.05,
+        ...     ka=1e3, kd=0.1, Lambda=100.0, nu=4.5,
+        ...     z_protein=5.0, c0=1e-6, c_salt=0.15
+        ... )
+    """
+    # Compute base state
+    Lambda_eff = Lambda - z_salt * c_salt  # Effective capacity with salt
+
+    # Equilibrium: q0 = K_eq * c0 * (Lambda_eff - z_protein*q0)^nu
+    # Low-loading approximation: q0 ≈ K_eq * c0 * Lambda_eff^nu / (1 + ...)
+    K_eq = ka / kd
+
+    # Iterative solution for base state (Newton's method, 1-2 iterations usually sufficient)
+    q0 = 0.0
+    for _ in range(5):
+        shield = Lambda_eff - z_protein * q0
+        if shield <= 0:
+            # Invalid state (overloaded), use low-loading limit
+            q0 = K_eq * c0 * Lambda_eff**nu / (1 + K_eq * c0 * nu * z_protein * Lambda_eff**(nu-1))
+            break
+        f_q = q0 - K_eq * c0 * shield**nu
+        df_q = 1.0 + K_eq * c0 * nu * z_protein * shield**(nu - 1)
+        q0_new = q0 - f_q / df_q
+        if abs(q0_new - q0) < 1e-12:
+            q0 = q0_new
+            break
+        q0 = q0_new
+
+    # Linearized rate constants around base state
+    shield_term = Lambda_eff - z_protein * q0
+
+    if shield_term <= 0:
+        # Invalid state, fall back to pure Langmuir
+        k_a_eff = ka * Lambda_eff**nu
+        k_d_eff = kd
+    else:
+        k_a_eff = ka * shield_term**nu
+        k_d_eff = kd + ka * c0 * nu * z_protein * shield_term**(nu - 1)
+
+    # Use Langmuir GRM with effective rate constants
+    return grm_langmuir_transfer(
+        velocity=velocity,
+        dispersion=dispersion,
+        length=length,
+        col_porosity=col_porosity,
+        par_radius=par_radius,
+        par_porosity=par_porosity,
+        film_diffusion=film_diffusion,
+        pore_diffusion=pore_diffusion,
+        ka=k_a_eff,
+        kd=k_d_eff,
+        qmax=Lambda_eff,  # Effective capacity as qmax
+    )
+
+
 def grm_moment_transfer(
     velocity: float = 1e-3,
     dispersion: float = 1e-6,
