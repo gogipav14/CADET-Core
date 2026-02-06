@@ -76,13 +76,24 @@ public:
 	/**
  	 * @brief Prototype of matrix-vector multiplication function provided to GMRES algorithm
  	 * @details Performs a matrix vector multiplication @f$ z = Ax @f$.
- 	 * 
+ 	 *
  	 * @param [in] userData User data
  	 * @param [in] x Vector the matrix is multiplied with
  	 * @param [out] z Result of the multiplication (memory is provided by the caller)
  	 * @return @c 0 if successful, any other value in case of failure
  	 */
 	typedef std::function<int(void* userData, double const* x, double* z)> MatrixVectorMultFun;
+
+	/**
+ 	 * @brief Prototype of preconditioner function provided to GMRES algorithm
+ 	 * @details Solves @f$ Mz = r @f$ where @f$ M @f$ approximates the linear operator.
+ 	 *
+ 	 * @param [in] userData User data
+ 	 * @param [in] r Residual vector
+ 	 * @param [out] z Preconditioned result (memory is provided by the caller)
+ 	 * @return @c 0 if successful, any other value in case of failure
+ 	 */
+	typedef std::function<int(void* userData, double const* r, double* z)> PreconditionerFun;
 
 	Gmres() CADET_NOEXCEPT;
 	~Gmres() CADET_NOEXCEPT;
@@ -181,6 +192,38 @@ public:
 	inline void userData(void* ud) CADET_NOEXCEPT { _userData = ud; }
 
 	/**
+	 * @brief Returns the preconditioner function
+	 * @return Preconditioner function (nullptr if not set)
+	 */
+	inline PreconditionerFun preconditioner() const CADET_NOEXCEPT { return _precond; }
+	/**
+	 * @brief Sets the preconditioner function
+	 * @param [in] pc Preconditioner function (or nullptr to disable)
+	 */
+	inline void preconditioner(PreconditionerFun pc) CADET_NOEXCEPT { _precond = pc; }
+	/**
+	 * @brief Sets the preconditioner function with user data
+	 * @param [in] pc Preconditioner function
+	 * @param [in] ud User data passed to the preconditioner function
+	 */
+	inline void preconditioner(PreconditionerFun pc, void* ud) CADET_NOEXCEPT
+	{
+		_precond = pc;
+		_precondUserData = ud;
+	}
+
+	/**
+	 * @brief Returns the user data passed to the preconditioner function
+	 * @return User data for preconditioner
+	 */
+	inline void* preconditionerUserData() const CADET_NOEXCEPT { return _precondUserData; }
+	/**
+	 * @brief Sets the user data passed to the preconditioner function
+	 * @param [in] ud User data
+	 */
+	inline void preconditionerUserData(void* ud) CADET_NOEXCEPT { _precondUserData = ud; }
+
+	/**
 	 * @brief Translates the return value of solve() to a human readable SUNDIALS error code
 	 * @param [in] flag Return value of solve()
 	 * @return Error keyword
@@ -209,6 +252,8 @@ protected:
 	unsigned int _matrixSize; //!< Size of the square matrix
 	MatrixVectorMultFun _matVecMul; //!< Matrix-vector multiplication function required for GMRES algorithm
 	void* _userData; //!< User data for matrix-vector multiplication function
+	PreconditionerFun _precond; //!< Optional preconditioner function (nullptr = no preconditioning)
+	void* _precondUserData; //!< User data for preconditioner function
 	int _numIter; //!< Accumulated number of iterations (Phase D instrumentation)
 
 #ifdef CADET_BENCHMARK_MODE

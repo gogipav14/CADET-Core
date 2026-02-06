@@ -27,7 +27,6 @@
 #include <sstream>
 #include <algorithm>
 #include <cstdlib>
-#include <iostream>
 
 #include "AutoDiff.hpp"
 #include "LoggingUtils.hpp"
@@ -321,14 +320,6 @@ namespace cadet
 	*/
 	int linearSolveWrapper(IDAMem IDA_mem, N_Vector rhs, N_Vector weight, N_Vector y, N_Vector yDot, N_Vector res)
 	{
-		// Phase D debug: Track if this wrapper is ever called
-		static int wrapperCallCount = 0;
-		++wrapperCallCount;
-		if (wrapperCallCount <= 5)
-		{
-			std::cout << "[Phase D Debug] linearSolveWrapper called (count=" << wrapperCallCount << ")" << std::endl;
-		}
-
 		cadet::Simulator* const sim = static_cast<cadet::Simulator*>(IDA_mem->ida_lmem);
 		const double t = IDA_mem->ida_tn;
 		const double alpha = IDA_mem->ida_cj;

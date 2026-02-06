@@ -175,6 +175,7 @@ set (LIBCADET_NONLINALG_SOURCES
 	${CMAKE_SOURCE_DIR}/src/libcadet/linalg/SparseMatrix.cpp
 	${CMAKE_SOURCE_DIR}/src/libcadet/linalg/CompressedSparseMatrix.cpp
 	${CMAKE_SOURCE_DIR}/src/libcadet/linalg/Gmres.cpp
+	${CMAKE_SOURCE_DIR}/src/libcadet/linalg/DanckwertsSpectralPreconditioner.cpp
 	${CMAKE_SOURCE_DIR}/src/libcadet/nonlin/AdaptiveTrustRegionNewton.cpp
 	${CMAKE_SOURCE_DIR}/src/libcadet/nonlin/LevenbergMarquardt.cpp
 	${CMAKE_SOURCE_DIR}/src/libcadet/nonlin/PseudoTransientContinuation.cpp

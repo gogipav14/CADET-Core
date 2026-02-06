@@ -30,6 +30,13 @@ def create_minimal_grm_config(
     binding_kd: float = 1.0,
     inlet_concentration: float = 1.0,
     enable_full_state_output: bool = False,
+    n_col: int = 8,
+    par_nelem: int = 1,
+    peclet: Optional[float] = None,
+    max_krylov: int = 0,
+    max_restarts: int = 10,
+    schur_safety: float = 1e-8,
+    spatial_method: str = "FV",  # "FV" or "DG"
 ) -> Path:
     """Create a minimal CADET GRM configuration HDF5 file.
 
@@ -56,6 +63,9 @@ def create_minimal_grm_config(
         binding_kd: Desorption rate constant.
         inlet_concentration: Inlet concentration for step input.
         enable_full_state_output: Enable bulk, particle, solid, and coordinate output.
+        n_col: Number of column discretization elements (NELEM).
+        par_nelem: Number of particle discretization elements (PAR_NELEM).
+        peclet: Peclet number (if provided, overrides col_dispersion calculation).
 
     Returns:
         Path to created HDF5 file.
@@ -65,6 +75,11 @@ def create_minimal_grm_config(
 
     # Generate solution times
     solution_times = np.linspace(0, end_time, n_times)
+
+    # Calculate dispersion from Peclet number if provided
+    if peclet is not None:
+        # Pe = velocity * col_length / col_dispersion
+        col_dispersion = velocity * col_length / peclet
 
     # Flow rate (arbitrary but consistent)
     flow_rate = velocity * col_porosity * 1e-4  # m^3/s for cross-section ~1e-4 m^2
@@ -113,11 +128,34 @@ def create_minimal_grm_config(
 
         # Column discretization (CADET v6 format)
         disc = unit_001.create_group("discretization")
-        _write_string(disc, "SPATIAL_METHOD", "DG")
-        disc.create_dataset("NELEM", data=8)
-        disc.create_dataset("POLYDEG", data=3)
-        disc.create_dataset("EXACT_INTEGRATION", data=1)
+        _write_string(disc, "SPATIAL_METHOD", spatial_method)
         disc.create_dataset("USE_ANALYTIC_JACOBIAN", data=1)
+
+        if spatial_method == "FV":
+            # Finite Volume: uses NCOL, WENO reconstruction, GMRES for Schur complement
+            disc.create_dataset("NCOL", data=n_col)
+            _write_string(disc, "RECONSTRUCTION", "WENO")
+
+            # GMRES solver parameters (in discretization group for FV)
+            disc.create_dataset("GS_TYPE", data=1)  # 1 = GMRES
+            disc.create_dataset("MAX_KRYLOV", data=max_krylov)
+            disc.create_dataset("MAX_RESTARTS", data=max_restarts)
+            disc.create_dataset("SCHUR_SAFETY", data=schur_safety)
+
+            # WENO parameters (required for WENO reconstruction)
+            weno = disc.create_group("weno")
+            weno.create_dataset("BOUNDARY_MODEL", data=0)
+            weno.create_dataset("WENO_EPS", data=1e-10)
+            weno.create_dataset("WENO_ORDER", data=1)
+
+        elif spatial_method == "DG":
+            # Discontinuous Galerkin: uses NELEM, polynomial degree
+            disc.create_dataset("NELEM", data=n_col)  # n_col used for element count
+            disc.create_dataset("POLYDEG", data=3)  # 3rd order polynomial
+            disc.create_dataset("EXACT_INTEGRATION", data=1)  # Exact integration
+
+        else:
+            raise ValueError(f"Unknown spatial_method: {spatial_method}. Must be 'FV' or 'DG'.")
 
         # ===== Particle type 0 (CADET v6 format) =====
         par_type_000 = unit_001.create_group("particle_type_000")
@@ -145,10 +183,20 @@ def create_minimal_grm_config(
 
         # Particle discretization (inside particle_type_000 for CADET v6)
         par_disc = par_type_000.create_group("discretization")
-        _write_string(par_disc, "SPATIAL_METHOD", "DG")
-        _write_string(par_disc, "PAR_DISC_TYPE", "EQUIDISTANT")
-        par_disc.create_dataset("PAR_NELEM", data=1)
-        par_disc.create_dataset("PAR_POLYDEG", data=3)
+
+        if spatial_method == "FV":
+            # Finite Volume particle discretization
+            _write_string(par_disc, "PAR_DISC_TYPE", "EQUIDISTANT_PAR")
+            par_disc.create_dataset("NCELLS", data=par_nelem)
+            par_disc.create_dataset("SPATIAL_METHOD", data=0)  # 0 = FV
+            par_disc.create_dataset("FV_BOUNDARY_ORDER", data=2)
+
+        elif spatial_method == "DG":
+            # Discontinuous Galerkin particle discretization
+            _write_string(par_disc, "PAR_DISC_TYPE", "EQUIDISTANT")
+            par_disc.create_dataset("PAR_NELEM", data=par_nelem)
+            _write_string(par_disc, "SPATIAL_METHOD", "DG")
+            par_disc.create_dataset("PAR_POLYDEG", data=3)
 
         # ===== Unit 002: OUTLET =====
         unit_002 = model.create_group("unit_002")
@@ -167,12 +215,12 @@ def create_minimal_grm_config(
             1, 2, -1, -1, flow_rate,  # GRM -> Outlet
         ])
 
-        # ===== Model solver settings =====
+        # ===== Model solver settings (system-level) =====
         model_solver = model.create_group("solver")
         model_solver.create_dataset("GS_TYPE", data=1)
-        model_solver.create_dataset("MAX_KRYLOV", data=0)
-        model_solver.create_dataset("MAX_RESTARTS", data=10)
-        model_solver.create_dataset("SCHUR_SAFETY", data=1e-8)
+        model_solver.create_dataset("MAX_KRYLOV", data=max_krylov)
+        model_solver.create_dataset("MAX_RESTARTS", data=max_restarts)
+        model_solver.create_dataset("SCHUR_SAFETY", data=schur_safety)
 
         # ===== Solver settings =====
         solver.create_dataset("NTHREADS", data=1)

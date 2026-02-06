@@ -33,6 +33,7 @@
 
 #include "linalg/BandMatrix.hpp"
 #include "linalg/Gmres.hpp"
+#include "linalg/DanckwertsSpectralPreconditioner.hpp"
 
 #include "LoggingUtils.hpp"
 #include "Logging.hpp"
@@ -487,9 +488,47 @@ public:
 
 	virtual bool initialize(IParameterProvider& paramProvider, unsigned int nComp, unsigned int nCol, unsigned int nChannel, const Weno& weno)
 	{
+		_nComp = nComp;
+		_nCol = nCol;
+		_nChannel = nChannel;
+
 		_gmres.initialize(nCol * nComp * nChannel, 0, linalg::toOrthogonalization(1), 0);
 		_gmres.matrixVectorMultiplier(&matrixMultiplierMultiChannelCDO, this);
 		_cache.resize(nCol * nComp * nChannel, 0.0);
+
+		// Read Danckwerts bulk preconditioner configuration
+		_useDanckwertsPrecond = paramProvider.exists("USE_DANCKWERTS_BULK_PRECOND") ? paramProvider.getInt("USE_DANCKWERTS_BULK_PRECOND") : 0;
+		if (_useDanckwertsPrecond)
+		{
+			_danckModes = paramProvider.exists("DANCKWERTS_BULK_PRECOND_MODES") ? paramProvider.getInt("DANCKWERTS_BULK_PRECOND_MODES") : 0;
+			if (_danckModes == 0)
+				_danckModes = std::min(nCol, 32u);  // Default: min(NCOL, 32)
+
+			// Read transport parameters for preconditioner
+			const double colLength = paramProvider.getDouble("COL_LENGTH");
+			std::vector<double> velocity;
+			readScalarParameterOrArray(velocity, paramProvider, "VELOCITY", 1);
+			const double avgVelocity = (velocity.empty()) ? 1.0 : velocity[0];
+
+			std::vector<double> dispersion;
+			readScalarParameterOrArray(dispersion, paramProvider, "COL_DISPERSION", 1);
+			const double avgDispersion = (dispersion.empty()) ? 0.01 : dispersion[0];
+
+			LOG(Info) << "[MultiChannel Operator] Danckwerts preconditioner ENABLED (modes=" << _danckModes
+			          << ", Pe=" << (avgVelocity * colLength / avgDispersion) << ")";
+
+			// Initialize the preconditioner
+			_danckPrecond.initialize(nCol, colLength, avgVelocity, avgDispersion, _danckModes);
+
+			// Wire preconditioner into GMRES via lambda (GmresSolver is protected, so free functions can't name it)
+			_gmres.preconditioner([](void* ud, double const* r, double* z) {
+				return static_cast<GmresSolver*>(ud)->applyDanckwertsPreconditioner(r, z);
+			}, this);
+
+			// Allocate preconditioner buffers
+			_precondBuffer.resize(nCol, 0.0);
+			_precondResult.resize(nCol, 0.0);
+		}
 
 		return true;
 	}
@@ -520,10 +559,64 @@ protected:
 	mutable linalg::Gmres _gmres; //!< GMRES algorithm for the Schur-complement in linearSolve()
 	mutable std::vector<double> _cache; //!< GMRES cache for result
 
+	// Danckwerts bulk preconditioner (Part A - Track 2b)
+	bool _useDanckwertsPrecond = false;
+	unsigned int _danckModes = 0;
+	unsigned int _nComp = 0;
+	unsigned int _nCol = 0;
+	unsigned int _nChannel = 0;
+	mutable linalg::DanckwertsSpectralPreconditioner _danckPrecond;
+	mutable std::vector<double> _precondBuffer; //!< Input buffer for preconditioner (size nCol)
+	mutable std::vector<double> _precondResult; //!< Output buffer for preconditioner (size nCol)
+
 	int matrixVectorMultiply(double const* x, double* z) const
 	{
 		std::fill(z, z + _jacC->rows(), _alpha);
 		_jacC->multiplyVector(x, 1.0, 1.0, z);
+		return 0;
+	}
+
+	// Preconditioner application for GMRES (block-diagonal along axial direction)
+	int applyDanckwertsPreconditioner(double const* r, double* z) const
+	{
+		if (!_useDanckwertsPrecond)
+		{
+			// Identity preconditioner
+			std::copy(r, r + _nCol * _nComp * _nChannel, z);
+			return 0;
+		}
+
+		// Block-diagonal: for each (channel, comp) slice along z
+		const unsigned int stride = _nChannel * _nComp;
+
+		for (unsigned int channel = 0; channel < _nChannel; ++channel)
+		{
+			for (unsigned int comp = 0; comp < _nComp; ++comp)
+			{
+				const unsigned int sliceOffset = channel * _nComp + comp;
+
+				// Extract axial vector
+				for (unsigned int col = 0; col < _nCol; ++col)
+				{
+					const unsigned int idx = col * stride + sliceOffset;
+					_precondBuffer[col] = r[idx];
+				}
+
+				// Apply 1D Danckwerts preconditioner
+				if (!_danckPrecond.apply(_alpha, _precondBuffer.data(), _precondResult.data()))
+				{
+					return -1;
+				}
+
+				// Write back
+				for (unsigned int col = 0; col < _nCol; ++col)
+				{
+					const unsigned int idx = col * stride + sliceOffset;
+					z[idx] = _precondResult[col];
+				}
+			}
+		}
+
 		return 0;
 	}
 

@@ -74,7 +74,13 @@ namespace cadet
 			lapackInt_t* LDA, double* TAU, double* C, lapackInt_t* LDC, double* WORK, lapackInt_t* LWORK, lapackInt_t* INFO);
 
 	extern "C" void LAPACK_FUNC(dtrtrs,DTRTRS) (char* UPLO, char* TRANS, char* DIAG, lapackInt_t* N, lapackInt_t* NRHS, double* A, lapackInt_t* LDA,
-			double* B, lapackInt_t* LDB, lapackInt_t* INFO);			
+			double* B, lapackInt_t* LDB, lapackInt_t* INFO);
+
+	extern "C" void LAPACK_FUNC(dgeqrf,DGEQRF) (lapackInt_t* M, lapackInt_t* N, double* A, lapackInt_t* LDA, double* TAU, double* WORK,
+			lapackInt_t* LWORK, lapackInt_t* INFO);
+
+	extern "C" void LAPACK_FUNC(dorgqr,DORGQR) (lapackInt_t* M, lapackInt_t* N, lapackInt_t* K, double* A, lapackInt_t* LDA, double* TAU,
+			double* WORK, lapackInt_t* LWORK, lapackInt_t* INFO);			
 
 	#ifdef CADET_LAPACK_TRAILING_UNDERSCORE
 		#ifdef CADET_LAPACK_UPPERCASE
@@ -88,6 +94,8 @@ namespace cadet
 			#define LapackFactorLQDense DGELQF_
 			#define LapackMultiplyFactorizedQ DORMLQ_
 			#define LapackSolveTriangular DTRTRS_
+			#define LapackFactorQRDense DGEQRF_
+			#define LapackGenerateQFromQR DORGQR_
 		#else
 			#define LapackFactorDenseBanded dgbtrf_
 			#define LapackSolveDenseBanded dgbtrs_
@@ -99,6 +107,8 @@ namespace cadet
 			#define LapackFactorLQDense dgelqf_
 			#define LapackMultiplyFactorizedQ dormlq_
 			#define LapackSolveTriangular dtrtrs_
+			#define LapackFactorQRDense dgeqrf_
+			#define LapackGenerateQFromQR dorgqr_
 		#endif
 	#else
 		#ifdef CADET_LAPACK_PRECEDING_UNDERSCORE
@@ -113,6 +123,8 @@ namespace cadet
 				#define LapackFactorLQDense _DGELQF
 				#define LapackMultiplyFactorizedQ _DORMLQ
 				#define LapackSolveTriangular _DTRTRS
+				#define LapackFactorQRDense _DGEQRF
+				#define LapackGenerateQFromQR _DORGQR
 			#else
 				#define LapackFactorDenseBanded _dgbtrf
 				#define LapackSolveDenseBanded _dgbtrs
@@ -124,6 +136,8 @@ namespace cadet
 				#define LapackFactorLQDense _dgelqf
 				#define LapackMultiplyFactorizedQ _dormlq
 				#define LapackSolveTriangular _dtrtrs
+				#define LapackFactorQRDense _dgeqrf
+				#define LapackGenerateQFromQR _dorgqr
 			#endif
 		#else
 			#ifdef CADET_LAPACK_UPPERCASE
@@ -137,6 +151,8 @@ namespace cadet
 				#define LapackFactorLQDense DGELQF
 				#define LapackMultiplyFactorizedQ DORMLQ
 				#define LapackSolveTriangular DTRTRS
+				#define LapackFactorQRDense DGEQRF
+				#define LapackGenerateQFromQR DORGQR
 			#else
 				#define LapackFactorDenseBanded dgbtrf
 				#define LapackSolveDenseBanded dgbtrs
@@ -148,6 +164,8 @@ namespace cadet
 				#define LapackFactorLQDense dgelqf
 				#define LapackMultiplyFactorizedQ dormlq
 				#define LapackSolveTriangular dtrtrs
+				#define LapackFactorQRDense dgeqrf
+				#define LapackGenerateQFromQR dorgqr
 			#endif
 		#endif
 	#endif

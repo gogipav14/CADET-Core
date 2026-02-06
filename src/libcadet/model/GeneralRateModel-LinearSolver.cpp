@@ -115,15 +115,6 @@ int GeneralRateModel<ConvDispOperator>::linearSolve(double t, double alpha, doub
 {
 	BENCH_SCOPE(_timerLinearSolve);
 
-	// Phase D debug: Track linearSolve invocations
-	static int linearSolveCallCount = 0;
-	++linearSolveCallCount;
-	if (linearSolveCallCount <= 5 || linearSolveCallCount % 100 == 0)
-	{
-		LOG(Debug) << "[Phase D Debug] linearSolve called (count=" << linearSolveCallCount
-		           << ", t=" << t << ", alpha=" << alpha << ", outerTol=" << outerTol << ")";
-	}
-
 	Indexer idxr(_disc);
 
 	// ==== Step 1: Factorize diagonal Jacobian blocks
@@ -264,26 +255,9 @@ int GeneralRateModel<ConvDispOperator>::linearSolve(double t, double alpha, doub
 		// The temporary storage is only needed to hold the right hand side of the Schur-complement
 		const double tolerance = std::sqrt(static_cast<double>(_gmres.matrixSize())) * outerTol * _schurSafety;
 
-		// Phase D debug: Track GMRES invocations
-		const int itersBefore = _gmres.numIterations();
-		if (linearSolveCallCount <= 5 || linearSolveCallCount % 100 == 0)
-		{
-			LOG(Debug) << "[Phase D Debug] Calling GMRES.solve (matrixSize=" << _gmres.matrixSize()
-			           << ", tolerance=" << tolerance << ", cumulative iters before=" << itersBefore << ")";
-		}
-
 		BENCH_START(_timerGmres);
 		_gmres.solve(tolerance, weight + idxr.offsetJf(), _tempState + idxr.offsetJf(), rhs + idxr.offsetJf());
 		BENCH_STOP(_timerGmres);
-
-		// Phase D debug: Report GMRES result
-		const int itersAfter = _gmres.numIterations();
-		const int itersDelta = itersAfter - itersBefore;
-		if (linearSolveCallCount <= 5 || linearSolveCallCount % 100 == 0)
-		{
-			LOG(Debug) << "[Phase D Debug] GMRES.solve completed (iterations this solve=" << itersDelta
-			           << ", cumulative total=" << itersAfter << ")";
-		}
 
 		// Remove temporary results that are leftovers from schurComplementMatrixVector()
 		std::fill(_tempState + idxr.offsetC(), _tempState + idxr.offsetJf(), 0.0);

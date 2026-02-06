@@ -22,7 +22,6 @@
 #include "SundialsVector.hpp"
 
 #include <type_traits>
-#include <iostream>
 
 namespace cadet
 {
@@ -35,20 +34,23 @@ int gmresCallback(void* userData, N_Vector v, N_Vector z)
 {
 	Gmres* const g = static_cast<Gmres*>(userData);
 
-	// Track iterations for performance instrumentation (Phase D)
+	// Track iterations for performance instrumentation
 	++g->_numIter;
-
-	// Phase D debug: Log first few callbacks to confirm GMRES is iterating
-	static int callbackCount = 0;
-	++callbackCount;
-	if (callbackCount <= 10)
-	{
-		std::cout << "[Phase D Debug] gmresCallback invoked (callback #" << callbackCount
-		          << ", cumulative GMRES iters=" << g->_numIter << ")" << std::endl;
-	}
 
 	Gmres::MatrixVectorMultFun callback = g->matrixVectorMultiplier();
 	return callback(g->userData(), NVEC_DATA(v), NVEC_DATA(z));
+}
+
+// Wrapper function for preconditioner (SUNDIALS interface)
+int gmresPrecondCallback(void* userData, N_Vector r, N_Vector z, double tol, int lr)
+{
+	Gmres* const g = static_cast<Gmres*>(userData);
+	Gmres::PreconditionerFun precond = g->preconditioner();
+
+	if (!precond)
+		return 0;  // No preconditioner, return identity
+
+	return precond(g->preconditionerUserData(), NVEC_DATA(r), NVEC_DATA(z));
 }
 
 Gmres::Gmres() CADET_NOEXCEPT :
@@ -58,7 +60,8 @@ Gmres::Gmres() CADET_NOEXCEPT :
 	_linearSolver(nullptr),
 #endif
 	_ortho(Orthogonalization::ModifiedGramSchmidt), _maxRestarts(0), _matrixSize(0), _matVecMul(nullptr), _userData(nullptr),
-	_numIter(0)  // Initialize iteration counter (Phase D instrumentation)
+	_precond(nullptr), _precondUserData(nullptr),
+	_numIter(0)
 {
 }
 
@@ -95,8 +98,10 @@ void Gmres::initialize(unsigned int matrixSize, unsigned int maxKrylov, Orthogon
 #if CADET_SUNDIALS_IFACE == 2
 	_mem = SpgmrMalloc(maxKrylov, NV_tmpl);
 #elif CADET_SUNDIALS_IFACE == 3
-	_linearSolver = SUNSPGMR(NV_tmpl, PREC_NONE, maxKrylov);
+	// Use PREC_LEFT to enable left preconditioning (will be active when preconditioner is set)
+	_linearSolver = SUNSPGMR(NV_tmpl, PREC_LEFT, maxKrylov);
 	SUNLinSolSetATimes(_linearSolver, this, &gmresCallback);
+	SUNLinSolSetPreconditioner(_linearSolver, this, nullptr, &gmresPrecondCallback);
 	SUNLinSolInitialize_SPGMR(_linearSolver);
 #endif
 
@@ -105,17 +110,6 @@ void Gmres::initialize(unsigned int matrixSize, unsigned int maxKrylov, Orthogon
 
 int Gmres::solve(double tolerance, double const* weight, double const* rhs, double* sol)
 {
-	// Phase D debug: Track GMRES solve invocations
-	static int gmresSolveCallCount = 0;
-	++gmresSolveCallCount;
-	const int itersBefore = _numIter;
-	if (gmresSolveCallCount <= 5 || gmresSolveCallCount % 100 == 0)
-	{
-		std::cout << "[Phase D Debug] Gmres::solve entered (call count=" << gmresSolveCallCount
-		          << ", matrixSize=" << _matrixSize << ", tolerance=" << tolerance
-		          << ", maxRestarts=" << _maxRestarts << ", cumulative iters=" << _numIter << ")" << std::endl;
-	}
-
 	// Create init-guess/solution vector by bending pointer
 	N_Vector NV_sol = NVec_NewEmpty(_matrixSize);
 	NVEC_DATA(NV_sol) = sol;
@@ -134,9 +128,10 @@ int Gmres::solve(double tolerance, double const* weight, double const* rhs, doub
 	int nIter = 0;
 	int nPrecondSolve = 0;
 	double resNorm = -1.0;
+	const int precType = (_precond != nullptr) ? PREC_LEFT : PREC_NONE;
 	const int flag = SpgmrSolve(_mem, this, NV_sol, NV_rhs,
-			PREC_NONE, gsType, tolerance, _maxRestarts, NULL,
-			NV_weight, NV_weight, &gmresCallback, NULL, 
+			precType, gsType, tolerance, _maxRestarts, NULL,
+			NV_weight, NV_weight, &gmresCallback, (_precond != nullptr) ? &gmresPrecondCallback : NULL,
 			&resNorm, &nIter, &nPrecondSolve);
 #elif CADET_SUNDIALS_IFACE == 3
 	SUNSPGMRSetGSType(_linearSolver, gsType);
@@ -155,16 +150,6 @@ int Gmres::solve(double tolerance, double const* weight, double const* rhs, doub
 	NVec_Destroy(NV_rhs);
 	NVec_Destroy(NV_weight);
 	NVec_Destroy(NV_sol);
-
-	// Phase D debug: Report GMRES solve result
-	const int itersAfter = _numIter;
-	const int itersDelta = itersAfter - itersBefore;
-	if (gmresSolveCallCount <= 5 || gmresSolveCallCount % 100 == 0)
-	{
-		std::cout << "[Phase D Debug] Gmres::solve completed (flag=" << flag
-		          << ", iterations this solve=" << itersDelta
-		          << ", cumulative total=" << itersAfter << ")" << std::endl;
-	}
 
 	return flag;
 }

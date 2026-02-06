@@ -90,3 +90,9 @@ build_DEBUG
 build_DEBUG_with_Tests
 install
 vcpkg_installed
+
+# Test artifacts and debug output
+test_debug/
+test_bulk_precond_results/
+test_precond_results/
+*.log

@@ -1,2 +1,4 @@
-# Allow JSON test artifacts
-!*.json
+# Ignore all benchmark/test artifacts (HDF5, JSON, subdirectories)
+*
+# Keep this .gitignore
+!.gitignore

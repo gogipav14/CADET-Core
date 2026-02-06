@@ -979,15 +979,6 @@ LinearSolverStats GeneralRateModel<ConvDispOperator>::getLinearSolverStats() con
 	stats.numGmresRestarts = 0; // Not currently tracked
 	stats.linearSolveTime = 0.0; // Not currently tracked
 
-	// Phase D debug: Log what we're returning
-	static bool logged = false;
-	if (!logged)
-	{
-		LOG(Debug) << "[Phase D Debug] GeneralRateModel::getLinearSolverStats() returning "
-		           << "numLinearIterations=" << stats.numLinearIterations;
-		logged = true;  // Only log once to avoid spam
-	}
-
 	return stats;
 }
 
