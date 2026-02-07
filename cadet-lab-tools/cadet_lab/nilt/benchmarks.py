@@ -178,33 +178,34 @@ def grm_langmuir_transfer(
         xi_sq = par_radius**2 * s * beta / pore_diffusion
         xi = cmath.sqrt(xi_sq)
 
-        # Particle response function η(s) using hyperbolic functions
-        # η = 3/ξ² · [sinh(ξ) - ξ·cosh(ξ)] / [sinh(ξ) + Bi·(sinh(ξ) - ξ·cosh(ξ))/ξ]
+        # Particle response function η(s):
+        # η = 3·(ξ·coth(ξ) - 1) / (ξ² · (1 + (ξ·coth(ξ) - 1)/Bi))
+        # = 3·A / (ξ²·(sinh(ξ) + A/Bi))  where A = ξ·cosh(ξ) - sinh(ξ)
 
         # Handle small ξ (Taylor expansion to avoid numerical issues)
         if abs(xi) < 1e-6:
-            # Limit as ξ→0: sinh(ξ)→ξ, cosh(ξ)→1, sinh(ξ)-ξ·cosh(ξ) → -ξ³/3
-            # η → 3/ξ² · (-ξ³/3) / (-ξ³/3·Bi/ξ) = 1/(1 + Bi/5) (from full expansion)
-            eta = 1.0 / (1.0 + Bi / 5.0)
+            # As ξ→0: A = ξ³/3, sinh ≈ ξ
+            # η → 3·(ξ³/3) / (ξ²·(ξ + ξ³/(3·Bi))) = 1/(1 + ξ²/(3·Bi)) → 1
+            eta = 1.0
         else:
             sinh_xi = cmath.sinh(xi)
             cosh_xi = cmath.cosh(xi)
 
-            numerator = sinh_xi - xi * cosh_xi
-            denominator = sinh_xi + Bi * numerator / xi
+            A = xi * cosh_xi - sinh_xi
+            denom = sinh_xi + A / Bi
 
             # Avoid division by very small denominator
-            if abs(denominator) < 1e-15:
+            if abs(denom) < 1e-15:
                 eta = 0.0
             else:
-                eta = 3.0 * numerator / (xi_sq * denominator)
+                eta = 3.0 * A / (xi_sq * denom)
 
         # Effective retardation factor: R_eff(s) = 1 + F·β(s)·η(s)
         R_eff = 1.0 + phase_ratio * beta * eta
 
         # Column transfer function with effective retardation
-        # F(s) = exp(Pe/2 · (1 - √[1 + 4·s·τ²·R_eff/Pe]))
-        inner = 1.0 + 4.0 * s * tau**2 * R_eff / Pe
+        # F(s) = exp(Pe/2 · (1 - √[1 + 4·s·τ·R_eff/Pe]))
+        inner = 1.0 + 4.0 * s * tau * R_eff / Pe
         sqrt_inner = cmath.sqrt(inner)
 
         return cmath.exp(Pe / 2.0 * (1.0 - sqrt_inner))

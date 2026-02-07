@@ -53,8 +53,16 @@ from .benchmarks import (
     get_benchmark_functions,
     advection_dispersion_transfer,
     langmuir_column_transfer,
+    grm_langmuir_transfer,
+    grm_sma_transfer,
     grm_moment_transfer,
 )
+
+# Solver API
+from .solver import NiltSolver, NiltSolution
+from .classify import classify_problem, ProblemClassification
+from .extract_params import extract_nilt_params
+from .output import write_cadet_h5, write_json
 
 __all__ = [
     # Vendored core NILT
@@ -85,5 +93,15 @@ __all__ = [
     "get_benchmark_functions",
     "advection_dispersion_transfer",
     "langmuir_column_transfer",
+    "grm_langmuir_transfer",
+    "grm_sma_transfer",
     "grm_moment_transfer",
+    # Solver API
+    "NiltSolver",
+    "NiltSolution",
+    "classify_problem",
+    "ProblemClassification",
+    "extract_nilt_params",
+    "write_cadet_h5",
+    "write_json",
 ]
